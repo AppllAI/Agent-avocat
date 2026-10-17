@@ -41,6 +41,17 @@ def pret() -> bool:
     return coach.onboarding_fini() or (config.OBJECTIF.exists() and bool(config.profil_texte().strip()))
 
 
+def _reessayer_cv():
+    """CV reçu mais pas encore analysé (erreur passagère) : nouvel essai, au plus 3 fois, espacés de 30 min."""
+    if not config.chemin_cv().exists() or config.profil_texte().strip():
+        return
+    essais = db.kv_get("profil_essais", {"n": 0, "dernier": 0})
+    if essais["n"] >= 3 or time.time() - essais["dernier"] < 1800:
+        return
+    db.kv_set("profil_essais", {"n": essais["n"] + 1, "dernier": time.time()})
+    _proteger("profileur", coach.recevoir_cv, config.chemin_cv())
+
+
 def en_fond(f, *a):
     """Travail long hors du fil des messages : tu peux continuer à écrire pendant ce temps."""
     threading.Thread(target=_proteger, args=(getattr(f, "__name__", "tâche"), f, *a), daemon=True).start()
@@ -49,6 +60,7 @@ def en_fond(f, *a):
 # ---------- étapes ----------
 def traitement():
     """Fait avancer toutes les offres en attente jusqu'à la carte « prête à envoyer »."""
+    _reessayer_cv()
     if en_pause() or not pret() or not _traitement.acquire(blocking=False):
         return
     try:

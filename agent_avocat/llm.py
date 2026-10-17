@@ -55,6 +55,11 @@ def _api():
 # Le reste est réservé à l'essentiel (écrire les lettres, te répondre, gérer les rendez-vous).
 PART_FOND = 0.7
 
+# Certains modèles (ex. Sonnet avec réflexion intégrée) refusent qu'on FORCE l'outil `repondre`.
+# On le détecte automatiquement et, pour eux, on demande poliment au lieu de forcer.
+_SANS_FORCAGE: set[str] = set()
+CONSIGNE_OUTIL = "\n\nTermine TOUJOURS en appelant l'outil `repondre` avec ta réponse complète."
+
 
 def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
              web: bool = False, recherches_max: int = 5, max_tokens: int = 1500,
@@ -83,7 +88,9 @@ def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
     messages = [{"role": "user", "content": contenu}]
     modele = MODELES[tier]()
     for tour in range(6):
-        r = _appel(modele, systeme, messages, tools, choix, max_tokens)
+        if modele in _SANS_FORCAGE:
+            choix = {"type": "auto"}
+        r = _appel(modele, systeme + CONSIGNE_OUTIL, messages, tools, choix, max_tokens)
         _compter(agent, tier, modele, r.usage)
         for b in r.content:
             if b.type == "tool_use" and b.name == "repondre":
@@ -106,6 +113,12 @@ def _appel(modele, systeme, messages, tools, choix, max_tokens):
                 system=[{"type": "text", "text": systeme, "cache_control": {"type": "ephemeral"}}],
                 messages=messages, tools=tools, tool_choice=choix,
             )
+        except anthropic.BadRequestError as e:
+            if "tool_choice" in str(e) and choix.get("type") != "auto":
+                _SANS_FORCAGE.add(modele)          # ce modèle ne veut pas d'outil forcé : on passe en « auto »
+                choix = {"type": "auto"}
+                continue
+            raise
         except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError):
             if essai == 3:
                 raise

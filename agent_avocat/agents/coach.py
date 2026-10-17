@@ -63,7 +63,7 @@ def parler(texte: str):
     o = config.objectif()
     actif = o.get("domaine_actif", "droit_belge")
     dom = o.setdefault("domaines", {}).setdefault(actif, {})
-    contexte = {"objectif_actuel": dom, "cv_recu": config.chemin_cv().exists(),
+    contexte = {"objectif_actuel": dom, "cv_recu": config.chemin_cv().exists() and bool(config.profil_texte().strip()),
                 "profil": config.profil_texte()[:1500], "historique": db.historique(10), "message": texte}
     try:
         r = llm.demander("coach", "rapide", llm.prompt("coach"), json.dumps(contexte, ensure_ascii=False),
@@ -95,6 +95,10 @@ def recevoir_cv(chemin: Path):
                          max_tokens=2500)
     except llm.BudgetDepasse as e:
         return messagerie.dire(f"⏸️ {e}.")
+    except Exception as e:
+        db.journal("profileur", f"lecture du CV en échec : {e}")
+        return messagerie.dire("⚠️ Je n'ai pas réussi à analyser ton CV (erreur technique). Je réessaie tout seul "
+                               "dans quelques minutes, pas besoin de le renvoyer.")
     (config.PROFIL_DIR / "profil.md").write_text(r["fiche_markdown"], encoding="utf-8")
     identite = {"NOM_CANDIDAT": r.get("nom"), "TELEPHONE": r.get("telephone")}
     db.kv_set("identite", identite)
