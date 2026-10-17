@@ -1,9 +1,9 @@
 {
   "name": "agent-avocat-pont-whatsapp",
   "private": true,
-  "type": "module",
-  "main": "pont.mjs",
-  "scripts": { "start": "node pont.mjs" },
+  "main": "pont.cjs",
+  "bin": "pont.cjs",
+  "scripts": { "start": "node pont.cjs" },
   "engines": { "node": ">=20" },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",

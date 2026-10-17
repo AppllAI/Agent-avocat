@@ -3,6 +3,7 @@ pyyaml>=6
 requests>=2.31
 fpdf2>=2.7          # PDF des lettres
 pypdf>=4            # lecture du CV
+qrcode>=7.4         # QR code WhatsApp dans l'application
 # Optionnels (décommente si tu veux) :
 # python-jobspy>=1.1   # Indeed Belgique sans IA (gratuit)
 # faster-whisper>=1.0  # vocaux transcrits sur ton PC, gratuitement

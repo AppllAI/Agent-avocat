@@ -10,11 +10,11 @@ RACINE = Path(os.getenv("AGENT_AVOCAT_RACINE", Path(__file__).resolve().parent.p
 DONNEES = RACINE / "donnees"
 PROFIL_DIR = RACINE / "profil"
 OBJECTIF = RACINE / "config" / "objectif.yaml"
-OBJECTIF_EXEMPLE = RACINE / "config" / "objectif.exemple.yaml"
+OBJECTIF_EXEMPLE = Path(__file__).resolve().parent / "objectif_exemple.yaml"
 PROMPTS = Path(__file__).resolve().parent / "prompts"
 
 
-def _charger_env():
+def _charger_env(ecraser: bool = False):
     f = RACINE / ".env"
     if not f.exists():
         return
@@ -22,8 +22,20 @@ def _charger_env():
         ligne = ligne.strip()
         if ligne and not ligne.startswith("#") and "=" in ligne:
             k, v = ligne.split("=", 1)
-            v = v.split(" #")[0].split("\t#")[0]   # commentaire en fin de ligne
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            k, v = k.strip(), v.strip()
+            if v[:1] in ('"', "'") and v[0] in v[1:]:
+                v = v[1:v.index(v[0], 1)]              # valeur entre guillemets : prise telle quelle
+            else:
+                v = v.split(" #")[0].split("\t#")[0].strip()   # commentaire en fin de ligne
+            if ecraser:
+                os.environ[k] = v
+            else:
+                os.environ.setdefault(k, v)
+
+
+def recharger_env():
+    """Après modification de .env par l'application : les nouveaux réglages s'appliquent tout de suite."""
+    _charger_env(ecraser=True)
 
 
 _charger_env()

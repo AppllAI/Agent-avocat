@@ -59,9 +59,20 @@ def expedier(m: EmailMessage):
         sortie.mkdir(parents=True, exist_ok=True)
         (sortie / f"{datetime.now():%Y%m%d_%H%M%S_%f}.eml").write_bytes(bytes(m))
         return
-    with smtplib.SMTP_SSL(config.env("SMTP_HOTE", "smtp.gmail.com"), config.env_int("SMTP_PORT", 465)) as s:
-        s.login(config.env("EMAIL_ADRESSE"), config.env("EMAIL_MOT_DE_PASSE"))
+    with connexion_smtp() as s:
         s.send_message(m)
+
+
+def connexion_smtp():
+    """SMTP chiffré : port 465 (SSL direct) ou 587 (STARTTLS), selon le fournisseur."""
+    hote, port = config.env("SMTP_HOTE", "smtp.gmail.com"), config.env_int("SMTP_PORT", 465)
+    if port == 465:
+        s = smtplib.SMTP_SSL(hote, port, timeout=30)
+    else:
+        s = smtplib.SMTP(hote, port, timeout=30)
+        s.starttls()
+    s.login(config.env("EMAIL_ADRESSE"), config.env("EMAIL_MOT_DE_PASSE"))
+    return s
 
 
 def envoyer(max_par_cycle: int = 5, pause_secondes: tuple = (90, 300)):

@@ -18,7 +18,21 @@ Tu parles à l'agent comme à quelqu'un, **à l'écrit ou en vocal**. Les refus 
 
 Commandes utiles : `stats` · `pause` · `reprendre` · `aide` — ou n'importe quelle phrase normale.
 
-## Installation (Windows)
+## L'application (le plus simple)
+
+Télécharge la dernière version dans l'onglet **Releases** de ce dépôt :
+- **Windows** : `AgentAvocat-Windows.exe` → double-clic. Rien à extraire.
+  Si Windows dit « a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
+- **Mac** : `AgentAvocat-Mac.dmg` → glisse *Agent Avocat* dans *Applications*. 1er lancement : clic droit → *Ouvrir*.
+
+Au premier lancement, trois cases : **adresse email**, **mot de passe d'application**, **clé API Claude**,
+puis tu choisis où l'agent te parle (WhatsApp → un QR code s'affiche à scanner). C'est tout.
+Tu peux aussi discuter avec l'agent directement dans la fenêtre et y déposer ton CV.
+
+**Publier une nouvelle version** : GitHub fabrique l'app tout seul (Windows + Mac). Crée un tag
+`v0.3.0` (onglet *Releases* → *Draft a new release* → *Choose a tag*), attends ~10 min, les fichiers apparaissent.
+
+## Installation développeur (Windows)
 
 1. Installe [Python 3.11+](https://www.python.org/downloads/) (coche *Add to PATH*) et [Node.js 20+](https://nodejs.org).
 2. Télécharge ce dossier, double-clique **`demarrer.bat`**. Au 1er lancement il installe tout et ouvre `.env` :

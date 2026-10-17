@@ -11,8 +11,6 @@ from pathlib import Path
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 TMP = Path(tempfile.mkdtemp(prefix="agent_avocat_test_"))
 os.environ.update({"AGENT_AVOCAT_RACINE": str(TMP), "SIMULATION": "1", "ANTHROPIC_API_KEY": ""})
-(TMP / "config").mkdir()
-shutil.copy(RACINE_PROJET / "config" / "objectif.exemple.yaml", TMP / "config" / "objectif.exemple.yaml")
 sys.path.insert(0, str(RACINE_PROJET))
 
 from agent_avocat import config, db, messagerie, orchestrateur, outils  # noqa: E402
