@@ -69,10 +69,15 @@ jobs:
           name: AgentAvocat-${{ matrix.nom }}
           path: livraison/*
 
-      - name: Publier la version
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publier la version (page Releases, liens à partager)
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.3.0' }}
+          name: Agent Avocat ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.3.0' }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          overwrite_files: true
           files: livraison/*
           body: |
             **Windows** : télécharge `AgentAvocat-Windows.exe` et double-clique.
