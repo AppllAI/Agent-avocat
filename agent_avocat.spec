@@ -5,7 +5,7 @@
 import platform
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 WINDOWS = platform.system() == "Windows"
 pont = Path("build/pont") / ("pont-whatsapp.exe" if WINDOWS else "pont-whatsapp")
@@ -14,9 +14,9 @@ a = Analysis(
     ["lanceur.py"],
     datas=[("agent_avocat/prompts", "agent_avocat/prompts"),
            ("agent_avocat/objectif_exemple.yaml", "agent_avocat"),
-           ("assets/icone_256.png", "assets")],
+           ("assets/icone_256.png", "assets")] + collect_data_files("tzdata"),
     binaries=[(str(pont), "pont")] if pont.exists() else [],
-    hiddenimports=collect_submodules("agent_avocat") + collect_submodules("anthropic") + ["qrcode", "pypdf", "fpdf"],
+    hiddenimports=collect_submodules("agent_avocat") + collect_submodules("anthropic") + ["qrcode", "pypdf", "fpdf", "tzdata"],
     excludes=["pytest", "numpy.tests"],
 )
 pyz = PYZ(a.pure)

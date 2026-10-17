@@ -45,11 +45,16 @@ jobs:
           npm install --omit=dev --no-audit --no-fund
           npx --yes @yao-pkg/pkg pont.cjs -t ${{ matrix.pkg }} -o ../build/pont/pont-whatsapp${{ matrix.ext }}
 
-      - name: Application
+      - name: Tests sur ce système (Windows / Mac)
         shell: bash
         run: |
           pip install -r requirements.txt pyinstaller pillow
-          pyinstaller --noconfirm agent_avocat.spec
+          python -m unittest discover tests
+          python -c "import agent_avocat.orchestrateur, agent_avocat.app.fenetre; print('imports ok')"
+
+      - name: Application
+        shell: bash
+        run: pyinstaller --noconfirm agent_avocat.spec
 
       - name: Emballage Windows
         if: runner.os == 'Windows'

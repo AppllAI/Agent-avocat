@@ -20,11 +20,14 @@ from .. import config, db, messagerie
 from . import controle
 from .redacteur import chemin_lettre
 
-BXL = ZoneInfo("Europe/Brussels")
+try:    # Windows n'a pas la base des fuseaux horaires : elle vient du paquet « tzdata »
+    BXL = ZoneInfo("Europe/Brussels")
+except Exception:
+    BXL = None   # à défaut : l'heure locale du PC (en Belgique, c'est la même)
 
 
 def heure_ouvrable(regles, maintenant=None) -> bool:
-    m = maintenant or datetime.now(BXL)
+    m = maintenant or (datetime.now(BXL) if BXL else datetime.now())
     debut, fin = regles["heures_envoi"]
     return m.weekday() in regles["jours_envoi"] and debut <= m.hour < fin
 
