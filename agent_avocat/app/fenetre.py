@@ -236,7 +236,11 @@ class Application(tk.Tk):
         v = reglages.reglages_depuis_formulaire(email, mdp, cle, "console" if canal == "app" else canal,
                                                 self.v_numero.get(), self.v_jeton.get())
         if self.v_openai.get().strip():
-            v["OPENAI_API_KEY"] = self.v_openai.get().strip()
+            v["OPENAI_API_KEY"] = reglages.nettoyer(self.v_openai.get())
+        souci = reglages.probleme_formulaire(v)
+        if souci:
+            self.bouton.state(["!disabled"])
+            return self.msg.configure(text=souci, style="Erreur.TLabel")
 
         def verifier():
             err = reglages.tester_email(v["EMAIL_ADRESSE"], v["EMAIL_MOT_DE_PASSE"], v["SMTP_HOTE"],

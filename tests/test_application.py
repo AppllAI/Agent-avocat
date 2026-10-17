@@ -19,6 +19,15 @@ class Reglages(unittest.TestCase):
         self.assertEqual(v["WHATSAPP_MON_NUMERO"], "32470123456")
         self.assertEqual(v["ANTHROPIC_API_KEY"], "sk-ant-x")
 
+    def test_copier_coller_gmail(self):
+        v = reglages.reglages_depuis_formulaire("a@gmail.com", "rqdw\u00a0thww\u00a0hmaq\u00a0aqzj",
+                                                "sk-ant-abc\u200b\n", "telegram", "", " 123:ABC\u00a0")
+        self.assertEqual(v["EMAIL_MOT_DE_PASSE"], "rqdwthwwhmaqaqzj")
+        self.assertEqual((v["ANTHROPIC_API_KEY"], v["TELEGRAM_JETON"]), ("sk-ant-abc", "123:ABC"))
+        self.assertIsNone(reglages.probleme_formulaire(v))
+        v2 = reglages.reglages_depuis_formulaire("a@gmail.com", "rądw thww hmaq aqzj", "sk-ant-x")
+        self.assertIn("16 lettres", reglages.probleme_formulaire(v2))
+
     def test_numero_international(self):
         v = reglages.reglages_depuis_formulaire("a@outlook.com", "x", "k", "whatsapp", "+32 470 12 34 56")
         self.assertEqual(v["WHATSAPP_MON_NUMERO"], "32470123456")

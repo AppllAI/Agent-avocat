@@ -104,19 +104,49 @@ def _guillemets(v: str) -> str:
     return f"'{v}'" if '"' in v else f'"{v}"'
 
 
+_INVISIBLES = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
+
+
+def nettoyer(texte: str) -> str:
+    """Retire les caractères invisibles qu'un copier-coller ramène souvent (espaces insécables, zéro-largeur…)."""
+    return "".join((texte or "").translate(_INVISIBLES).split())
+
+
+def nettoyer_mot_de_passe(email: str, mdp: str) -> str:
+    if "gmail" in email.lower() or "googlemail" in email.lower():
+        # Google affiche le code en 4 blocs avec des espaces (souvent insécables) : on ne garde que les lettres
+        return "".join(c for c in mdp if c.isascii() and c.isalpha())
+    return (mdp or "").translate(_INVISIBLES).strip()
+
+
+def probleme_formulaire(v: dict) -> str | None:
+    """Vérifications instantanées avant de contacter les serveurs."""
+    gmail = "gmail" in v["EMAIL_ADRESSE"].lower()
+    if gmail and len(v["EMAIL_MOT_DE_PASSE"]) != 16:
+        return (f"Le code Gmail doit faire 16 lettres (j'en lis {len(v['EMAIL_MOT_DE_PASSE'])}). "
+                "Recopie-le depuis myaccount.google.com/apppasswords, lettres a-z seulement.")
+    for nom, cle in (("mot de passe", "EMAIL_MOT_DE_PASSE"), ("clé API", "ANTHROPIC_API_KEY"),
+                     ("jeton Telegram", "TELEGRAM_JETON")):
+        if not str(v.get(cle, "")).isascii():
+            mauvais = next(c for c in v[cle] if not c.isascii())
+            return f"Ton {nom} contient un caractère spécial (« {mauvais} ») : retape-le à la main."
+    if v.get("TELEGRAM_JETON") and ":" not in v["TELEGRAM_JETON"]:
+        return "Le jeton Telegram doit ressembler à 123456789:ABC… (avec deux-points)."
+    return None
+
+
 def reglages_depuis_formulaire(email: str, mot_de_passe: str, cle_api: str, canal: str = "whatsapp",
                                numero: str = "", jeton_telegram: str = "", serveurs_manuels=None) -> dict:
-    email = email.strip()
+    email = nettoyer(email)
     smtp = serveurs_manuels or serveurs(email) or ("", 465, "")
-    v = {"ANTHROPIC_API_KEY": cle_api.strip(), "EMAIL_ADRESSE": email,
-         # les mots de passe d'application Google s'affichent avec des espaces : on les retire
-         "EMAIL_MOT_DE_PASSE": mot_de_passe.replace(" ", "") if "gmail" in email.lower() else mot_de_passe.strip(),
+    v = {"ANTHROPIC_API_KEY": nettoyer(cle_api), "EMAIL_ADRESSE": email,
+         "EMAIL_MOT_DE_PASSE": nettoyer_mot_de_passe(email, mot_de_passe),
          "SMTP_HOTE": smtp[0], "SMTP_PORT": smtp[1], "IMAP_HOTE": smtp[2], "CANAL": canal,
          "WHATSAPP_MON_NUMERO": "".join(c for c in numero if c.isdigit()).lstrip("0")}
     if v["WHATSAPP_MON_NUMERO"] and len(v["WHATSAPP_MON_NUMERO"]) <= 9:   # 0470… → 32470…
         v["WHATSAPP_MON_NUMERO"] = "32" + v["WHATSAPP_MON_NUMERO"]
     if jeton_telegram:
-        v["TELEGRAM_JETON"] = jeton_telegram.strip()
+        v["TELEGRAM_JETON"] = nettoyer(jeton_telegram)
     return v
 
 
@@ -137,6 +167,8 @@ def tester_email(email: str, mot_de_passe: str, hote_smtp: str, port: int, hote_
         m = imaplib.IMAP4_SSL(hote_imap, timeout=20)
         m.login(email, mot_de_passe)
         m.logout()
+    except UnicodeEncodeError:
+        return "Le mot de passe contient un caractère spécial invisible : retape-le à la main (lettres a-z)."
     except (smtplib.SMTPAuthenticationError, imaplib.IMAP4.error):
         return ("Adresse ou mot de passe refusé. Pour Gmail, il faut un « mot de passe d'application » "
                 "(16 lettres), pas ton mot de passe habituel.")
