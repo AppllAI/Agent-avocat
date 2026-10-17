@@ -128,13 +128,35 @@ class Application(tk.Tk):
     def ecran_reglages(self):
         self._vider()
         env = reglages.lire_env(self.racine)
-        cadre = ttk.Frame(self, padding=28)
-        cadre.pack(fill="both", expand=True)
-        if self.logo_moyen:
-            tk.Label(cadre, image=self.logo_moyen, bg=FOND).pack()
-        ttk.Label(cadre, text="Agent Avocat", style="Titre.TLabel").pack(pady=(8, 0))
+        self.ecran = "reglages"
+        # Barre du bas TOUJOURS visible (bouton + message), quelle que soit la taille de l'écran
+        bas = ttk.Frame(self, padding=(28, 8, 28, 14))
+        bas.pack(side="bottom", fill="x")
+        self.msg = ttk.Label(bas, text="", style="Erreur.TLabel", wraplength=900, justify="left")
+        self.msg.pack(fill="x", pady=(0, 4))
+        self.bouton = ttk.Button(bas, text="Vérifier et démarrer  ⏎", style="Principal.TButton", command=self._valider)
+        self.bouton.pack(fill="x")
+        ttk.Label(bas, text="Tout reste sur ton ordinateur. Rien n'est envoyé ailleurs qu'à ton email et à Claude.",
+                  style="Sous.TLabel", justify="center").pack(pady=(6, 0))
+        self.bind("<Return>", lambda _e: self._valider() if getattr(self, "ecran", "") == "reglages" else None)
+
+        # Contenu défilant (molette) pour les petits écrans
+        zone = tk.Canvas(self, bg=FOND, highlightthickness=0)
+        barre = ttk.Scrollbar(self, orient="vertical", command=zone.yview)
+        zone.configure(yscrollcommand=barre.set)
+        barre.pack(side="right", fill="y")
+        zone.pack(side="top", fill="both", expand=True)
+        cadre = ttk.Frame(zone, padding=(28, 14, 28, 8))
+        fen = zone.create_window((0, 0), window=cadre, anchor="nw")
+        cadre.bind("<Configure>", lambda _e: zone.configure(scrollregion=zone.bbox("all")))
+        zone.bind("<Configure>", lambda e: zone.itemconfigure(fen, width=e.width))
+        self.bind_all("<MouseWheel>", lambda e: zone.yview_scroll(int(-e.delta / 120) or (-1 if e.delta > 0 else 1), "units")
+                      if getattr(self, "ecran", "") == "reglages" and zone.winfo_exists() else None)
+        if self.petit_logo:
+            tk.Label(cadre, image=self.petit_logo, bg=FOND).pack()
+        ttk.Label(cadre, text="Agent Avocat", style="Titre.TLabel").pack(pady=(4, 0))
         ttk.Label(cadre, text="Il postule à ta place et te prévient seulement quand il faut décider.",
-                  style="Sous.TLabel", wraplength=460, justify="center").pack(pady=(2, 18))
+                  style="Sous.TLabel", wraplength=460, justify="center").pack(pady=(2, 8))
 
         self.v_email = tk.StringVar(value=env.get("EMAIL_ADRESSE", ""))
         self.v_mdp = tk.StringVar(value=env.get("EMAIL_MOT_DE_PASSE", ""))
@@ -145,7 +167,7 @@ class Application(tk.Tk):
         self.v_jeton = tk.StringVar(value=env.get("TELEGRAM_JETON", ""))
 
         def champ(titre, var, aide=None, secret=False, lien=None):
-            ttk.Label(cadre, text=titre, font=("Helvetica", 12, "bold")).pack(anchor="w", pady=(10, 2))
+            ttk.Label(cadre, text=titre, font=("Helvetica", 12, "bold")).pack(anchor="w", pady=(6, 2))
             e = ttk.Entry(cadre, textvariable=var, show="•" if secret else "")
             e.pack(fill="x")
             ligne = ttk.Frame(cadre)
@@ -174,12 +196,6 @@ class Application(tk.Tk):
         self.zone_canal.pack(fill="x")
         self._maj_canal()
 
-        self.msg = ttk.Label(cadre, text="", style="Erreur.TLabel", wraplength=480, justify="left")
-        self.msg.pack(fill="x", pady=(14, 4))
-        self.bouton = ttk.Button(cadre, text="Vérifier et démarrer", style="Principal.TButton", command=self._valider)
-        self.bouton.pack(fill="x", pady=(4, 0))
-        ttk.Label(cadre, text="Tout reste sur ton ordinateur. Rien n'est envoyé ailleurs qu'à ton email et à Claude.",
-                  style="Sous.TLabel", wraplength=480, justify="center").pack(pady=(10, 0))
 
     def _maj_canal(self):
         for w in self.zone_canal.winfo_children():
@@ -206,6 +222,8 @@ class Application(tk.Tk):
             ttk.Entry(self.zone_canal, textvariable=self.v_openai, show="•").pack(fill="x")
 
     def _valider(self):
+        if self.bouton.instate(["disabled"]):     # déjà en cours de vérification
+            return
         email, mdp, cle, canal = self.v_email.get().strip(), self.v_mdp.get(), self.v_cle.get().strip(), self.v_canal.get()
         if not (email and mdp and cle):
             return self.msg.configure(text="Remplis les trois cases.", style="Erreur.TLabel")
@@ -237,6 +255,7 @@ class Application(tk.Tk):
 
     # ---------- écran 2 : tableau de bord ----------
     def ecran_tableau(self):
+        self.ecran = "tableau"
         self._vider()
         haut = tk.Frame(self, bg=MARINE)
         haut.pack(fill="x")
