@@ -17,6 +17,9 @@ Actions possibles :
   → `texte` = la consigne reformulée en une phrase claire, elle s'appliquera à toutes les lettres.
 - `chercher` : elle veut une recherche tout de suite.
 - `essai` : elle donne un lien d'offre pour voir ce que l'agent ferait, sans envoyer.
+- `banc` : elle veut d'abord tester / voir si ça marche / juger la qualité, SANS lien d'offre
+  (« j'aimerais d'abord essayer », « montre-moi ce que tu sais faire ») → 5 lettres d'exemple notées.
+- Elle peut demander comment faire quelque chose : explique simplement dans `reponse` (action `discuter`).
 - `stats` · `pause` · `reprendre` · `aide`
 - `discuter` : simple question ou info ; réponds toi-même dans `reponse` avec le contexte fourni.
 

@@ -167,7 +167,14 @@ class Circuit(unittest.TestCase):
         self.assertEqual(config.regles_envoi()["mode"], "validation")
         self.assertNotIn("🧪", self.dernier())
 
-    def test_7_banc_essai(self):
+    def test_7_test_en_langage_naturel(self):
+        concierge.recevoir(Entrant(texte="j'aimerais d'abord essayer pour voir si ça marche"))
+        self.assertIn("Test terminé", self.canal.messages[-1])
+        self.assertTrue(any(f.name == "banc_essai.md" for f in self.canal.fichiers))
+        concierge.recevoir(Entrant(texte="aide"))
+        self.assertIn("teste-toi", self.dernier())
+
+    def test_8_banc_essai(self):
         rapport = essai.banc_essai()
         texte = rapport.read_text(encoding="utf-8")
         self.assertIn("Note moyenne du Juge", texte)

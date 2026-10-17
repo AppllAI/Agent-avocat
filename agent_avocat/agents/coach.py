@@ -40,15 +40,23 @@ def onboarding_fini() -> bool:
     return bool(db.kv_get("onboarding_fini", False))
 
 
+MENU = ("📋 *Ce que tu peux me dire* (ou en vocal 🎙️, avec tes mots) :\n"
+        "• « ok » / « ok sauf 3 » / « montre 3 » → valider, retirer, voir une lettre\n"
+        "• « oui » / « plutôt jeudi » / « non » → répondre à un entretien\n"
+        "• « essai » + un lien d'offre → je te montre ce que je ferais, sans envoyer\n"
+        "• « teste-toi » → 5 lettres d'exemple notées, pour juger ma qualité\n"
+        "• « plus de droit fiscal », « ajoute Liège » → changer ta recherche\n"
+        "• « trop long », « moins formel » → régler le style des lettres\n"
+        "• « cherche » · « stats » · « pause » · « reprendre » · « mode »")
+
+
 def bienvenue():
-    messagerie.dire("👋 Salut ! Je suis ton agent de candidature. Je cherche les offres en continu, j'écris une "
-                    "lettre sur mesure pour chacune, je postule et je ne te dérange que pour décider "
-                    "(une candidature à valider, un entretien).\n\n"
-                    "Pour commencer :\n1️⃣ envoie-moi ton *CV en PDF* ici\n"
-                    "2️⃣ dis-moi (écrit ou vocal 🎙️) ce que tu cherches : poste, matières de droit, villes, "
-                    "ce que tu ne veux surtout pas.\n\n"
-                    "On démarre en *mode répétition* 🧪 : tout est réel, mais les emails arrivent dans TA boîte, "
-                    "pas chez les cabinets. Tu passes en vrai quand tu es convaincu.")
+    messagerie.dire("⚖️ *Agent Avocat*\nJe cherche les offres en continu, j'écris une lettre sur mesure pour "
+                    "chacune et je postule. Je ne te dérange que pour décider.\n\n"
+                    "*Pour démarrer :*\n1️⃣ Envoie ton CV en PDF ici\n2️⃣ Dis-moi ce que tu cherches "
+                    "(poste, matières, villes, ce que tu refuses)\n\n"
+                    "🧪 Je démarre en *mode répétition* : les emails arrivent dans TA boîte, jamais chez les "
+                    "cabinets, tant que tu ne me dis pas « mode validation ».\n\n" + MENU)
 
 
 def parler(texte: str):

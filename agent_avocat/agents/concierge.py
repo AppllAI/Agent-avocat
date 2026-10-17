@@ -22,8 +22,8 @@ SCHEMA = {
     "properties": {
         "action": {"type": "string", "enum": [
             "valider", "ecarter", "details", "confirmer_rdv", "autre_date", "decliner_rdv", "repondre_recruteur",
-            "objectif", "profil", "style", "fait", "chercher", "essai", "stats", "pause", "reprendre", "aide",
-            "discuter"]},
+            "objectif", "profil", "style", "fait", "chercher", "essai", "banc", "stats", "pause", "reprendre",
+            "aide", "discuter"]},
         "ids": {"type": "array", "items": {"type": "integer"}},
         "rdv_id": {"type": ["integer", "null"]}, "creneau": {"type": ["string", "null"]},
         "email_id": {"type": ["integer", "null"]}, "texte": {"type": ["string", "null"]},
@@ -31,14 +31,6 @@ SCHEMA = {
     },
     "required": ["action", "reponse"],
 }
-AIDE = ("Je m'occupe de tout, tu ne fais que décider. Touche les boutons, ou dis-moi par exemple :\n"
-        "• « ok », « ok sauf 3 », « montre 3 » pour les candidatures prêtes\n"
-        "• « oui », « plutôt jeudi 14h », « non » pour un entretien\n"
-        "• « plus de droit fiscal », « ajoute Liège » pour changer ta recherche\n"
-        "• « mes lettres sont trop longues » pour régler le style\n"
-        "• « essai » + un lien d'offre : je te montre ce que je ferais, sans rien envoyer\n"
-        "• « cherche » (recherche tout de suite), « stats », « pause », « reprendre »\n"
-        "• « mode répétition / validation / auto »\nLes vocaux 🎙️ marchent aussi.")
 MODES = {"repetition": "🧪 Répétition : tout est réel, mais les emails partent vers TA boîte, jamais vers les cabinets.",
          "validation": "✋ Validation : je t'envoie chaque candidature, rien ne part sans ton ✅.",
          "auto": "🚀 Auto : j'envoie seul les candidatures que le Juge note ≥ 8/10. Je te préviens pour les entretiens."}
@@ -109,8 +101,10 @@ def _raccourci(t: str) -> bool:
     rdv_ouverts = db.q("SELECT id FROM rdv WHERE statut='propose'")
     if b in ("stats", "bilan", "statistiques"):
         messagerie.dire(rapporteur.stats())
-    elif b in ("aide", "help", "start", "commandes"):
-        messagerie.dire(AIDE)
+    elif b in ("aide", "help", "start", "commandes", "menu"):
+        messagerie.dire(coach.MENU)
+    elif b in ("teste-toi", "testes-toi", "teste toi", "banc", "banc d'essai", "banc-essai"):
+        _fond(_banc)
     elif b in ("pause", "stop"):
         db.kv_set("pause", True)
         messagerie.dire("⏸️ En pause : plus aucune recherche ni envoi. « reprendre » quand tu veux.")
@@ -205,9 +199,13 @@ def _ia(texte: str):
             return _fait(ids)
         elif a == "chercher":
             return _raccourci("cherche")
+        elif a == "banc":
+            return _fond(_banc)
         elif a == "essai" and re.search(r"https?://\S+", texte):
             return _fond(_essai, re.search(r"https?://\S+", texte).group(0))
-        elif a in ("stats", "aide", "pause", "reprendre"):
+        elif a == "aide":
+            return messagerie.dire(coach.MENU)
+        elif a in ("stats", "pause", "reprendre"):
             return _raccourci(a)
     except Exception as e:
         db.journal("concierge", f"action {a} en échec : {e}")
@@ -288,6 +286,20 @@ def _vrai(i):
 def _essai(url):
     from .essai import essayer
     essayer(url)
+
+
+def _banc():
+    """« teste-toi » / « je veux d'abord voir si ça marche » : 5 lettres d'exemple notées, rien n'est envoyé."""
+    from .essai import banc_essai
+    messagerie.dire("🧪 Je me teste sur 5 offres d'exemple (lettres + notes du Juge). Rien n'est envoyé. ~3 min, "
+                    "je te préviens quand c'est prêt.")
+    f = banc_essai()
+    texte = f.read_text(encoding="utf-8")
+    note = re.search(r"Note moyenne du Juge : ([\d.]+)/10\** · coût : ([\d.]+) €", texte)
+    messagerie.dire(f"✅ Test terminé : note moyenne {note.group(1)}/10, coût {note.group(2)} €. "
+                    "Le rapport complet (les 5 lettres) est ci-dessous. Dis-moi ce qui te plaît ou pas, j'apprends.\n"
+                    "Ensuite : envoie-moi « essai » + le lien d'une vraie offre.")
+    messagerie.fichier(f, "Rapport du test")
 
 
 def _fait(ids):
