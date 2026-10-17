@@ -106,7 +106,12 @@ class Telegram:
     def ecouter(self, callback):
         from ..agents.concierge import Entrant
 
+        try:   # un webhook éventuel empêcherait de recevoir les messages
+            self._post("deleteWebhook", data={"drop_pending_updates": "false"})
+        except Exception as e:
+            print("Telegram : jeton refusé ou pas d'internet :", e, flush=True)
         self._menu()
+        print("Telegram : à l'écoute des messages", flush=True)
         if not self.chat:
             lien = self.lien_appairage()
             print(f"\n👉 Ouvre ce lien sur ton téléphone pour relier ton Telegram : {lien}\n"
@@ -143,13 +148,19 @@ class Telegram:
         chat = m.get("chat", {}).get("id")
         texte = (m.get("text") or "").strip()
         if not self.chat:
-            if texte in (self.code, f"/start {self.code}"):
+            code = texte.removeprefix("/start").strip()
+            if code == self.code:
                 self.chat = chat
                 db.kv_set("telegram_chat", chat)
-                db.kv_set("bienvenue_envoyee", False)
-                from ..agents import coach
                 db.kv_set("bienvenue_envoyee", True)
+                print(f"✅ Telegram relié (conversation {chat})", flush=True)
+                from ..agents import coach
                 coach.bienvenue()
+            elif chat:
+                print(f"Telegram : message reçu (« {texte[:30]} ») mais pas le bon code d'appairage", flush=True)
+                self._post("sendMessage", data={"chat_id": chat, "text":
+                           "🔒 Pour relier ce bot, envoie ici le code à 6 chiffres affiché dans l'application "
+                           "Agent Avocat sur ton ordinateur (sous le QR code)."})
             return
         if chat != self.chat:
             return

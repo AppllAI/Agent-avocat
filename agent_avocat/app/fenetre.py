@@ -405,6 +405,7 @@ class Application(tk.Tk):
                       font=("Helvetica", 12, "bold"), wraplength=500).pack(pady=(4, 6))
             self._dessiner_qr(lien)
             self._lien(self.zone_qr, lien, lien).pack(pady=(4, 0))
+            ttk.Label(self.zone_qr, text=f"ou envoie ce code au bot : {tg.code}", font=("Helvetica", 13, "bold")).pack()
         else:
             ttk.Label(self.zone_qr, text="Jeton Telegram refusé : vérifie-le dans ⚙ Réglages.", style="Erreur.TLabel").pack()
         self.after(3000, lambda: self._suivre_telegram(tg))
