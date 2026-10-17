@@ -1,0 +1,33 @@
+# Ton objectif. Le Coach le remplit avec toi sur WhatsApp, mais tu peux aussi l'éditer à la main.
+# Les règles "uniquement" / "exclues" sont STRICTES : une offre qui les viole n'est jamais postulée.
+
+domaine_actif: droit_belge
+
+domaines:
+  droit_belge:
+    description: ""
+    postes_vises: [stagiaire avocat, juriste, collaborateur, paralegal]
+    matieres_uniquement: []          # ex. [droit immobilier] → SEULEMENT ça
+    matieres_exclues: [droit pénal]  # ex. jamais de pénal
+    villes: [Bruxelles]
+    teletravail_ok: true
+    langues: [français]
+    contrats: [CDI, CDD, stage]
+    exclure_entreprises: []
+    disponibilite: ""
+    mots_cles_recherche:
+      - juriste Bruxelles
+      - stage avocat Bruxelles
+      - collaborateur avocat Bruxelles
+      - paralegal Bruxelles
+    # Pages que tu veux surveiller en plus (flux RSS ou pages carrières de cabinets)
+    pages_a_surveiller: []
+
+envoi:
+  mode: validation        # validation = tu valides sur WhatsApp · auto = envoi direct
+  max_par_jour: 15
+  score_minimum: 7        # sur 10
+  heures_envoi: [8, 19]   # n'envoie qu'en journée (heure belge)
+  jours_envoi: [0, 1, 2, 3, 4]   # lundi → vendredi
+  relance_apres_jours: 8
+  delai_meme_cabinet_jours: 60   # jamais 2 candidatures au même cabinet dans ce délai

@@ -1,0 +1,115 @@
+"""Couche IA unique pour tous les agents — pensée pour dépenser le moins de tokens possible.
+
+Principes (tirés des guides d'Anthropic et des projets publics qui marchent) :
+  1. Deux niveaux de modèle : "rapide" (Haiku, pas cher) pour trier/noter/classer,
+     "qualite" (Sonnet) uniquement pour écrire ce que les recruteurs liront.
+  2. Sortie TOUJOURS structurée via un outil forcé (`repondre`) → zéro JSON cassé, zéro bavardage.
+  3. Prompt système mis en cache (prompt caching) → les gros blocs fixes coûtent ~10 % au 2e appel.
+  4. Budget journalier en euros : au-delà, les agents IA s'arrêtent, le reste continue.
+  5. Mode SIMULATION : tout le circuit tourne sans clé API (réponses factices réalistes).
+"""
+from __future__ import annotations
+
+import time
+from datetime import date
+
+from . import config, db
+
+MODELES = {
+    "rapide": lambda: config.env("MODELE_RAPIDE", "claude-haiku-5-5"),
+    "qualite": lambda: config.env("MODELE_QUALITE", "claude-sonnet-5-5"),
+}
+# Prix approximatifs en € par million de tokens (entrée, sortie) — ajustables dans .env
+PRIX = {
+    "rapide": tuple(float(x) for x in config.env("PRIX_RAPIDE", "1,5").split(",")),
+    "qualite": tuple(float(x) for x in config.env("PRIX_QUALITE", "3,15").split(",")),
+}
+
+
+class BudgetDepasse(RuntimeError):
+    pass
+
+
+def depense_du_jour() -> float:
+    r = db.q1("SELECT COALESCE(SUM(eur),0) AS s FROM couts WHERE date(le)=?", date.today().isoformat())
+    return float(r["s"])
+
+
+def prompt(nom: str) -> str:
+    return (config.PROMPTS / f"{nom}.md").read_text(encoding="utf-8")
+
+
+_client = None
+
+
+def _api():
+    global _client
+    if _client is None:
+        import anthropic
+
+        _client = anthropic.Anthropic(api_key=config.env("ANTHROPIC_API_KEY"), max_retries=3)
+    return _client
+
+
+def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
+             web: bool = False, recherches_max: int = 5, max_tokens: int = 1500) -> dict:
+    """Pose une question à l'IA et renvoie un dict conforme à `schema`."""
+    if config.simulation():
+        from . import simulation
+
+        return simulation.repondre(agent, contenu, schema)
+
+    budget = float(config.env("BUDGET_JOUR_EUR", "2"))
+    if depense_du_jour() >= budget:
+        raise BudgetDepasse(f"Budget du jour atteint ({budget} €)")
+
+    outil = {"name": "repondre", "description": "Rends ta réponse finale structurée.", "input_schema": schema}
+    tools = [outil]
+    choix = {"type": "tool", "name": "repondre"}
+    if web:
+        tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": recherches_max,
+                  "user_location": {"type": "approximate", "country": "BE", "timezone": "Europe/Brussels"}},
+                 outil]
+        choix = {"type": "auto"}
+
+    messages = [{"role": "user", "content": contenu}]
+    modele = MODELES[tier]()
+    for tour in range(6):
+        r = _appel(modele, systeme, messages, tools, choix, max_tokens)
+        _compter(agent, tier, modele, r.usage)
+        for b in r.content:
+            if b.type == "tool_use" and b.name == "repondre":
+                return dict(b.input)
+        # Recherche web en cours (pause) ou réponse sans l'outil : on relance en continuant
+        messages.append({"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in r.content]})
+        if r.stop_reason != "pause_turn":
+            messages.append({"role": "user", "content": "Rends maintenant ta réponse avec l'outil `repondre`."})
+            choix = {"type": "tool", "name": "repondre"}
+    raise RuntimeError(f"{agent} : pas de réponse structurée")
+
+
+def _appel(modele, systeme, messages, tools, choix, max_tokens):
+    import anthropic
+
+    for essai in range(4):
+        try:
+            return _api().messages.create(
+                model=modele, max_tokens=max_tokens,
+                system=[{"type": "text", "text": systeme, "cache_control": {"type": "ephemeral"}}],
+                messages=messages, tools=tools, tool_choice=choix,
+            )
+        except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError):
+            if essai == 3:
+                raise
+            time.sleep(5 * 2 ** essai)
+
+
+def _compter(agent, tier, modele, u):
+    cache_lu = getattr(u, "cache_read_input_tokens", 0) or 0
+    cache_ecrit = getattr(u, "cache_creation_input_tokens", 0) or 0
+    p_in, p_out = PRIX[tier]
+    eur = (u.input_tokens * p_in + cache_ecrit * p_in * 1.25 + cache_lu * p_in * 0.1
+           + u.output_tokens * p_out) / 1_000_000
+    with db.tx() as c:
+        c.execute("INSERT INTO couts (agent, modele, entree, sortie, cache, eur) VALUES (?,?,?,?,?,?)",
+                  (agent, modele, u.input_tokens + cache_ecrit, u.output_tokens, cache_lu, eur))
