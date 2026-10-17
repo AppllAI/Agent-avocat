@@ -49,8 +49,15 @@ jobs:
         shell: bash
         run: |
           pip install -r requirements.txt pyinstaller pillow
-          python -m unittest discover tests
-          python -c "import agent_avocat.orchestrateur, agent_avocat.app.fenetre; print('imports ok')"
+          set +e
+          python -m unittest discover tests -v > resultat_tests.txt 2>&1
+          code=$?
+          python -c "import agent_avocat.orchestrateur, agent_avocat.app.fenetre; print('imports ok')" >> resultat_tests.txt 2>&1 || code=1
+          tail -n 60 resultat_tests.txt
+          if [ $code -ne 0 ]; then
+            echo "::error title=Tests ${{ runner.os }}::$(grep -v '^\[' resultat_tests.txt | tail -n 40 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          fi
 
       - name: Application
         shell: bash
