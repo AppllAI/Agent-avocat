@@ -48,10 +48,14 @@ class CanalApp:
         if interne:
             self.nom = f"application + {interne.nom}"
 
-    def envoyer(self, texte):
-        self.file.put(("agent", texte))
+    def envoyer(self, texte, boutons=None):
+        self.file.put(("agent", (texte, boutons)))
         if self.interne:
-            self.interne.envoyer(texte)
+            self.interne.envoyer(texte, boutons)
+
+    def occupe(self):
+        if self.interne and hasattr(self.interne, "occupe"):
+            self.interne.occupe()
 
     def envoyer_fichier(self, chemin, legende=""):
         self.file.put(("fichier", (str(chemin), legende)))
@@ -135,7 +139,8 @@ class Application(tk.Tk):
         self.v_email = tk.StringVar(value=env.get("EMAIL_ADRESSE", ""))
         self.v_mdp = tk.StringVar(value=env.get("EMAIL_MOT_DE_PASSE", ""))
         self.v_cle = tk.StringVar(value=env.get("ANTHROPIC_API_KEY", ""))
-        self.v_canal = tk.StringVar(value=env.get("CANAL", "whatsapp") if env.get("CANAL") != "console" else "app")
+        self.v_canal = tk.StringVar(value=env.get("CANAL", "telegram") if env.get("CANAL") != "console" else "app")
+        self.v_openai = tk.StringVar(value=env.get("OPENAI_API_KEY", ""))
         self.v_numero = tk.StringVar(value=env.get("WHATSAPP_MON_NUMERO", ""))
         self.v_jeton = tk.StringVar(value=env.get("TELEGRAM_JETON", ""))
 
@@ -162,7 +167,7 @@ class Application(tk.Tk):
         ttk.Label(cadre, text="Où l'agent te parle", font=("Helvetica", 12, "bold")).pack(anchor="w", pady=(16, 2))
         choix = ttk.Frame(cadre)
         choix.pack(fill="x")
-        for texte, val in (("WhatsApp", "whatsapp"), ("Telegram", "telegram"), ("Ici seulement", "app")):
+        for texte, val in (("Telegram (conseillé)", "telegram"), ("WhatsApp", "whatsapp"), ("Ici seulement", "app")):
             ttk.Radiobutton(choix, text=texte, value=val, variable=self.v_canal,
                             command=self._maj_canal).pack(side="left", padx=(0, 14))
         self.zone_canal = ttk.Frame(cadre)
@@ -188,9 +193,17 @@ class Application(tk.Tk):
         elif c == "telegram":
             l = ttk.Frame(self.zone_canal)
             l.pack(fill="x", pady=(8, 0))
-            ttk.Label(l, text="Jeton du bot Telegram", style="Sous.TLabel").pack(side="left")
-            self._lien(l, "Créer mon bot (@BotFather)", "https://t.me/BotFather").pack(side="right")
+            ttk.Label(l, text="Jeton de ton bot Telegram", style="Sous.TLabel").pack(side="left")
+            self._lien(l, "Ouvrir @BotFather", "https://t.me/BotFather").pack(side="right")
             ttk.Entry(self.zone_canal, textvariable=self.v_jeton).pack(fill="x")
+            ttk.Label(self.zone_canal, wraplength=480, style="Sous.TLabel", justify="left",
+                      text="2 min : dans Telegram, ouvre @BotFather → /newbot → choisis un nom → copie le jeton ici.").pack(anchor="w")
+        if c in ("telegram", "whatsapp"):
+            l = ttk.Frame(self.zone_canal)
+            l.pack(fill="x", pady=(8, 0))
+            ttk.Label(l, text="Clé OpenAI pour les vocaux (facultatif)", style="Sous.TLabel").pack(side="left")
+            self._lien(l, "Pourquoi ?", "https://platform.openai.com/api-keys").pack(side="right")
+            ttk.Entry(self.zone_canal, textvariable=self.v_openai, show="•").pack(fill="x")
 
     def _valider(self):
         email, mdp, cle, canal = self.v_email.get().strip(), self.v_mdp.get(), self.v_cle.get().strip(), self.v_canal.get()
@@ -204,6 +217,8 @@ class Application(tk.Tk):
         self.msg.configure(text="Vérification de l'email et de la clé…", style="Sous.TLabel")
         v = reglages.reglages_depuis_formulaire(email, mdp, cle, "console" if canal == "app" else canal,
                                                 self.v_numero.get(), self.v_jeton.get())
+        if self.v_openai.get().strip():
+            v["OPENAI_API_KEY"] = self.v_openai.get().strip()
 
         def verifier():
             err = reglages.tester_email(v["EMAIL_ADRESSE"], v["EMAIL_MOT_DE_PASSE"], v["SMTP_HOTE"],
@@ -273,6 +288,25 @@ class Application(tk.Tk):
         widget.configure(state="disabled")
         widget.see("end")
 
+    def _boutons(self, boutons):
+        """Les boutons de l'agent, cliquables directement dans la fenêtre."""
+        if not boutons:
+            return
+        self.chat.configure(state="normal")
+        for ligne in boutons:
+            for lib, cmd in ligne:
+                b = ttk.Button(self.chat, text=lib, command=lambda c=cmd: self._commande(c))
+                self.chat.window_create("end", window=b, padx=3, pady=2)
+            self.chat.insert("end", "\n")
+        self.chat.configure(state="disabled")
+        self.chat.see("end")
+
+    def _commande(self, cmd):
+        if self.canal and self.canal.callback:
+            from ..agents.concierge import Entrant
+            self._ajouter(self.chat, f"▸ {cmd}", "moi")
+            self.canal.callback(Entrant(texte=cmd))
+
     def _demarrer_agent(self):
         if self.demarre:
             return self._rafraichir_etat()
@@ -290,6 +324,7 @@ class Application(tk.Tk):
         elif canal_nom == "telegram":
             from ..canaux.telegram import Telegram
             interne = Telegram()
+            self.after(1500, lambda: self._suivre_telegram(interne))
         self.canal = CanalApp(self.file, interne)
         empecher_veille()
 
@@ -330,6 +365,26 @@ class Application(tk.Tk):
         else:
             ttk.Label(self.zone_qr, text="Connexion à WhatsApp…", style="Sous.TLabel").pack(anchor="w")
         self.after(2500, self._suivre_whatsapp)
+
+    def _suivre_telegram(self, tg):
+        """Tant que ton Telegram n'est pas relié : QR code + lien d'appairage dans la fenêtre."""
+        if not self.winfo_exists() or not hasattr(self, "zone_qr"):
+            return
+        for w in self.zone_qr.winfo_children():
+            w.destroy()
+        if tg.chat:
+            ttk.Label(self.zone_qr, text="✓ Telegram relié — tu peux fermer cette fenêtre de l'esprit, "
+                                         "tout se passe sur ton téléphone.", style="Ok.TLabel", wraplength=500).pack(anchor="w")
+            return
+        lien = tg.lien_appairage()
+        if lien:
+            ttk.Label(self.zone_qr, text="Scanne avec l'appareil photo de ton téléphone pour relier Telegram :",
+                      font=("Helvetica", 12, "bold"), wraplength=500).pack(pady=(4, 6))
+            self._dessiner_qr(lien)
+            self._lien(self.zone_qr, lien, lien).pack(pady=(4, 0))
+        else:
+            ttk.Label(self.zone_qr, text="Jeton Telegram refusé : vérifie-le dans ⚙ Réglages.", style="Erreur.TLabel").pack()
+        self.after(3000, lambda: self._suivre_telegram(tg))
 
     def _dessiner_qr(self, texte):
         try:
@@ -385,7 +440,9 @@ class Application(tk.Tk):
                 elif not hasattr(self, "chat") or not self.chat.winfo_exists():
                     continue
                 elif genre == "agent":
-                    self._ajouter(self.chat, x, "agent")
+                    texte, boutons = x if isinstance(x, tuple) else (x, None)
+                    self._ajouter(self.chat, texte, "agent")
+                    self._boutons(boutons)
                 elif genre == "fichier":
                     self._ajouter(self.chat, f"📎 {x[1]} — {Path(x[0]).name}", "info")
                 elif genre == "journal":

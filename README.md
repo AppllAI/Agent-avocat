@@ -8,15 +8,17 @@ Tu parles à l'agent comme à quelqu'un, **à l'écrit ou en vocal**. Les refus 
 
 ## Comment ça se passe pour toi
 
-1. Tu lances l'agent (double-clic sur `demarrer.bat`).
-2. Sur WhatsApp, il te demande ton CV (PDF) et ce que tu cherches. Plus tu es précis, plus il est strict :
+1. Tu ouvres l'application, tu remplis : email, mot de passe d'application, clé API, jeton Telegram.
+2. Sur Telegram, l'agent te demande ton CV (PDF) et ce que tu cherches (écrit ou vocal) :
    « que du droit immobilier, Bruxelles ou Namur, jamais de pénal, CDI ou stage ».
-3. Il cherche toutes les 3 heures, écrit les lettres, et te propose les meilleures :
-   *« 3 candidatures prêtes… réponds ok »*. Tu réponds **ok**, **ok sauf 2** ou **montre 2**.
-4. Il envoie (heures de bureau, rythme humain), relance après 8 jours, lit les réponses.
-5. Entretien proposé → il te demande → tu dis **oui** → il répond au cabinet et t'envoie le rdv pour ton agenda.
+3. Il cherche en continu (LexGO, web, cabinets à contacter spontanément), écrit et fait noter chaque lettre,
+   puis t'envoie des cartes : **[✅ Envoyer] [👁 Lettre] [❌ Non]**.
+4. Il envoie, relance après 8 jours, lit les réponses. Les refus ? Tu n'en entends pas parler.
+5. Entretien proposé → **[✅ Jeudi 16h30] [📆 Autre date]** → il répond au cabinet, t'envoie le rdv
+   pour ton agenda, et la veille une fiche pour préparer l'entretien.
 
-Commandes utiles : `stats` · `pause` · `reprendre` · `aide` — ou n'importe quelle phrase normale.
+On démarre en **mode répétition** 🧪 : tout est réel, mais les emails arrivent dans TA boîte.
+Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## L'application (le plus simple)
 
@@ -26,7 +28,7 @@ Télécharge la dernière version dans l'onglet **Releases** de ce dépôt :
 - **Mac** : `AgentAvocat-Mac.dmg` → glisse *Agent Avocat* dans *Applications*. 1er lancement : clic droit → *Ouvrir*.
 
 Au premier lancement, trois cases : **adresse email**, **mot de passe d'application**, **clé API Claude**,
-puis tu choisis où l'agent te parle (WhatsApp → un QR code s'affiche à scanner). C'est tout.
+puis le jeton de ton bot Telegram (2 min avec @BotFather). Un QR code s'affiche : tu le scannes, c'est relié.
 Tu peux aussi discuter avec l'agent directement dans la fenêtre et y déposer ton CV.
 
 **Publier une nouvelle version** : GitHub fabrique l'app tout seul (Windows + Mac). Crée un tag

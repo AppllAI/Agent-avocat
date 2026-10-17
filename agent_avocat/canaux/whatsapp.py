@@ -24,7 +24,9 @@ class WhatsApp:
         self.pont = config.env("WHATSAPP_PONT_URL", "http://127.0.0.1:3010")
         self.port = config.env_int("PORT_AGENT", 3011)
 
-    def envoyer(self, texte):
+    def envoyer(self, texte, boutons=None):
+        if boutons:   # pas de boutons sur WhatsApp non officiel : on indique quoi répondre
+            texte += "\n\n" + "\n".join(f"→ « {cmd} » : {lib}" for ligne in boutons for lib, cmd in ligne)
         try:
             requests.post(f"{self.pont}/envoyer", json={"texte": texte}, timeout=20)
         except Exception as e:

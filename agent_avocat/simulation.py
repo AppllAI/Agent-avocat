@@ -41,20 +41,32 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
         for o in d:
             imm = "immobilier" in (o.get("matiere") or "")
             notes.append({"id": o["id"], "regle_violee": False, "score": 9 if imm else 5,
-                          "raison": "Matière et ville alignées" if imm else "Matière secondaire"})
+                          "raison": "Matière et ville alignées" if imm else "Matière secondaire",
+                          "pourquoi": ["Mémoire en droit de la copropriété ↔ dossiers de copropriété"] if imm else []})
         return {"notes": notes}
     if agent == "enqueteur":
         return {"faits": [f"{d.get('employeur')} est actif en baux commerciaux à Bruxelles."],
                 "email_recrutement": None, "destinataire": None}
     if agent == "redacteur":
         o = d["offre"]
+        corps = ("Mon parcours m'a permis de travailler des dossiers concrets, de rédiger des notes de synthèse "
+                 "et de suivre des audiences, ce qui correspond aux missions décrites dans votre annonce. ") * 6
         return {"lettre": f"Bruxelles, le {d['date_du_jour']}\n\nMadame, Monsieur,\n\nVotre offre de {o['poste']} "
-                          f"chez {o['employeur']} a retenu toute mon attention…\n\nJe vous prie d'agréer, Madame, "
-                          "Monsieur, l'expression de mes salutations distinguées.",
+                          f"chez {o['employeur']} a retenu toute mon attention.\n\n{corps}\n\nJe vous prie d'agréer, "
+                          "Madame, Monsieur, l'expression de mes salutations distinguées.\n\nAlex Test",
                 "objet": f"Candidature – {o['poste']}",
                 "email": "Madame, Monsieur,\n\nVeuillez trouver ci-joint mon CV et ma lettre de motivation.\n\nBien à vous"}
-    if agent == "verificateur":
-        return {"ok": True, "corrections": []}
+    if agent == "juge":
+        return {"note": 9, "invention": False, "corrections": []}
+    if agent == "prospecteur":
+        return {"employeurs": [
+            {"nom": "Cabinet Horizon Immo", "site": "https://horizon-immo.example", "ville": "Bruxelles",
+             "matieres": ["droit immobilier"], "email_recrutement": "stage@horizon-immo.example",
+             "destinataire": None, "faits": ["Actif en baux commerciaux."]},
+            {"nom": "Sans Email & Co", "site": "https://sansemail.example", "ville": "Bruxelles",
+             "matieres": ["droit immobilier"], "email_recrutement": None, "faits": []}]}
+    if agent == "preparateur":
+        return {"fiche": "1. L'employeur…\n2. Pourquoi toi…"}
     if agent == "trieur":
         t = f"{d.get('sujet', '')} {d.get('corps', '')}".lower()
         if "entretien" in t or "rencontrer" in t:
@@ -71,6 +83,8 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
         rdv = (d.get("contexte") or {}).get("rdv_proposes") or []
         if rdv and re.search(r"\b(oui|ok|parfait|confirme)", m):
             return {"action": "confirmer_rdv", "rdv_id": rdv[0]["id"], "reponse": "Je confirme !"}
+        if "longue" in m or "formel" in m:
+            return {"action": "style", "texte": "Lettres plus courtes (250 mots max).", "reponse": "Noté"}
         return {"action": "discuter", "reponse": "Bien noté 👍"}
     if agent == "coach":
         m = d.get("message", "").lower()

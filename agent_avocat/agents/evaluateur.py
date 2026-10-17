@@ -11,12 +11,14 @@ SCHEMA = {
     "properties": {"notes": {"type": "array", "items": {
         "type": "object",
         "properties": {"id": {"type": "integer"}, "regle_violee": {"type": "boolean"},
-                       "score": {"type": "integer", "minimum": 1, "maximum": 10}, "raison": {"type": "string"}},
-        "required": ["id", "regle_violee", "score", "raison"],
+                       "score": {"type": "integer", "minimum": 1, "maximum": 10}, "raison": {"type": "string"},
+                       "pourquoi": {"type": "array", "items": {"type": "string"}, "maxItems": 3,
+                                    "description": "2-3 liens concrets entre CE profil et CETTE offre"}},
+        "required": ["id", "regle_violee", "score", "raison", "pourquoi"],
     }}},
     "required": ["notes"],
 }
-CHAMPS = ("id", "titre", "entreprise", "ville", "matiere", "contrat", "langue", "description")
+CHAMPS = ("id", "source", "titre", "entreprise", "ville", "matiere", "contrat", "langue", "publie_le", "description")
 
 
 def evaluer(taille_lot: int = 8):
@@ -42,6 +44,7 @@ def evaluer(taille_lot: int = 8):
                 continue
             ok = not n["regle_violee"] and n["score"] >= regles["score_minimum"]
             db.changer_statut(n["id"], "qualifiee" if ok else "ecartee", "evaluateur",
-                              f"{n['score']}/10 · {n['raison']}", score=n["score"])
+                              f"{n['score']}/10 · {n['raison']}", score=n["score"],
+                              pourquoi=json.dumps(n.get("pourquoi") or [], ensure_ascii=False))
             retenues += ok
     return retenues

@@ -7,16 +7,22 @@ from .. import db, llm, messagerie
 
 
 def stats() -> str:
+    from .. import config
+
     s = {r["statut"]: r["n"] for r in db.q("SELECT statut, COUNT(*) AS n FROM offres GROUP BY statut")}
     envoyees = sum(s.get(k, 0) for k in ("envoyee", "relancee", "refus", "entretien", "sans_reponse", "offre_recue"))
     rdv = db.q1("SELECT COUNT(*) AS n FROM rdv WHERE statut='confirme'")["n"]
     total = db.q1("SELECT COALESCE(SUM(eur),0) AS e FROM couts")["e"]
-    return (f"📊 *Bilan*\n"
-            f"Envoyées : {envoyees} · en attente de ton ok : {s.get('a_valider', 0)} · à faire via site : {s.get('manuelle', 0)}\n"
-            f"Entretiens : {s.get('entretien', 0)} (rdv confirmés : {rdv}) · refus : {s.get('refus', 0)} · "
-            f"sans réponse : {s.get('sans_reponse', 0)}\n"
-            f"Offres écartées par tes règles : {s.get('ecartee', 0)}\n"
-            f"Coût IA : {llm.depense_du_jour():.2f} € aujourd'hui · {total:.2f} € au total")
+    lignes = [f"📊 *Bilan* · mode {config.regles_envoi()['mode']}"]
+    if s.get("repetee"):
+        lignes.append(f"Répétitions (envoyées à toi seulement) : {s['repetee']}")
+    lignes += [f"Envoyées : {envoyees} · en attente de ton ok : {s.get('a_valider', 0)} · "
+               f"à faire via site : {s.get('manuelle', 0)}",
+               f"Entretiens : {s.get('entretien', 0)} (rdv confirmés : {rdv}) · refus : {s.get('refus', 0)} · "
+               f"sans réponse : {s.get('sans_reponse', 0)}",
+               f"Offres écartées par tes règles : {s.get('ecartee', 0)}",
+               f"Coût IA : {llm.depense_du_jour():.2f} € aujourd'hui · {total:.2f} € au total"]
+    return "\n".join(lignes)
 
 
 def bilan_du_jour():

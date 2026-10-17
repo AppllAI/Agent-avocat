@@ -1,8 +1,11 @@
-"""Agent 18 — Concierge : le SEUL qui te parle. Il reçoit tes messages (texte, vocal, PDF),
+"""Agent Concierge : le SEUL qui te parle. Il reçoit tes messages (texte, vocal, PDF, boutons touchés),
 comprend ce que tu veux et passe la main au bon agent (motif « routing » d'Anthropic).
 
-Économie : les commandes évidentes (« stats », « ok », « ok sauf 3 », « montre 4 », « pause »)
-sont reconnues sans IA. L'IA rapide n'intervient que pour les phrases libres."""
+Réactivité :
+  • commandes et boutons (« ok 12 », « montre 12 », « stats »…) → reconnus SANS IA, réponse instantanée ;
+  • phrase libre → IA rapide (Haiku), réponse en quelques secondes, « … écrit » affiché pendant ce temps ;
+  • travail long (envoi, recherche, essai, lecture du CV) → « ⏳ je m'en occupe » tout de suite,
+    puis il tourne en arrière-plan et tu reçois une notification quand c'est prêt."""
 from __future__ import annotations
 
 import json
@@ -10,16 +13,17 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import db, llm, messagerie
+from .. import config, db, llm, messagerie
 from . import coach, rapporteur, secretaire, transcripteur
-from .redacteur import chemin_lettre
+from .redacteur import carte, chemin_lettre
 
 SCHEMA = {
     "type": "object",
     "properties": {
         "action": {"type": "string", "enum": [
             "valider", "ecarter", "details", "confirmer_rdv", "autre_date", "decliner_rdv", "repondre_recruteur",
-            "objectif", "profil", "fait", "stats", "pause", "reprendre", "aide", "discuter"]},
+            "objectif", "profil", "style", "fait", "chercher", "essai", "stats", "pause", "reprendre", "aide",
+            "discuter"]},
         "ids": {"type": "array", "items": {"type": "integer"}},
         "rdv_id": {"type": ["integer", "null"]}, "creneau": {"type": ["string", "null"]},
         "email_id": {"type": ["integer", "null"]}, "texte": {"type": ["string", "null"]},
@@ -27,11 +31,17 @@ SCHEMA = {
     },
     "required": ["action", "reponse"],
 }
-AIDE = ("Je m'occupe de tout, tu n'interviens que pour décider. Tu peux me dire par exemple :\n"
-        "• « ok » / « ok sauf 3 » / « montre 3 » pour les candidatures en attente\n"
-        "• « oui » / « plutôt jeudi 14h » / « non » pour un entretien\n"
-        "• « je ne veux plus de droit fiscal », « ajoute Liège » pour changer ta recherche\n"
-        "• « stats », « pause », « reprendre »\nLes vocaux marchent aussi 🎙️")
+AIDE = ("Je m'occupe de tout, tu ne fais que décider. Touche les boutons, ou dis-moi par exemple :\n"
+        "• « ok », « ok sauf 3 », « montre 3 » pour les candidatures prêtes\n"
+        "• « oui », « plutôt jeudi 14h », « non » pour un entretien\n"
+        "• « plus de droit fiscal », « ajoute Liège » pour changer ta recherche\n"
+        "• « mes lettres sont trop longues » pour régler le style\n"
+        "• « essai » + un lien d'offre : je te montre ce que je ferais, sans rien envoyer\n"
+        "• « cherche » (recherche tout de suite), « stats », « pause », « reprendre »\n"
+        "• « mode répétition / validation / auto »\nLes vocaux 🎙️ marchent aussi.")
+MODES = {"repetition": "🧪 Répétition : tout est réel, mais les emails partent vers TA boîte, jamais vers les cabinets.",
+         "validation": "✋ Validation : je t'envoie chaque candidature, rien ne part sans ton ✅.",
+         "auto": "🚀 Auto : j'envoie seul les candidatures que le Juge note ≥ 8/10. Je te préviens pour les entretiens."}
 
 
 @dataclass
@@ -42,59 +52,104 @@ class Entrant:
     nom_fichier: str = ""
 
 
+def _fond(f, *a):
+    from .. import orchestrateur
+    orchestrateur.en_fond(f, *a)
+
+
 def recevoir(m: Entrant):
     if m.fichier:
         if (m.nom_fichier or str(m.fichier)).lower().endswith(".pdf"):
-            coach.recevoir_cv(Path(m.fichier))
-            if not coach.onboarding_fini():
-                coach.parler(m.texte or "Voici mon CV.")
-            return
+            messagerie.dire("📄 Je lis ton CV…")
+
+            def lire():
+                coach.recevoir_cv(Path(m.fichier))
+                if not coach.onboarding_fini():
+                    coach.parler(m.texte or "Voici mon CV.")
+            return _fond(lire)
         return messagerie.dire("Je ne sais lire que les PDF pour l'instant 📄")
     texte = (m.texte or "").strip()
     if m.audio:
+        messagerie.occupe()
         try:
             texte = (transcripteur.transcrire(Path(m.audio)) or "").strip()
         except Exception as e:
             db.journal("transcripteur", f"échec : {e}")
             texte = ""
         if not texte:
-            return messagerie.dire("🎙️ Je n'ai pas pu écouter ton vocal, tu peux me l'écrire ?")
-        db.journal("transcripteur", f"« {texte[:80]} »")
+            return messagerie.dire("🎙️ Je n'arrive pas encore à écouter les vocaux (voir réglages : transcription). "
+                                   "Tu peux me l'écrire ?")
+        messagerie.dire(f"🎙️ « {texte[:300]} »")
     if not texte:
         return
     db.dire("moi", texte)
 
-    if not coach.onboarding_fini():
-        return coach.parler(texte)
     if _raccourci(texte):
         return
+    attente = db.kv_get("attente_dispo")
+    if attente:                                   # elle répond aux « quelles sont tes dispos ? »
+        db.kv_set("attente_dispo", None)
+        return _fond(secretaire.autre_date, attente, texte)
+    if not coach.onboarding_fini():
+        messagerie.occupe()
+        return coach.parler(texte)
+    messagerie.occupe()
     _ia(texte)
 
 
-# ---------- Raccourcis sans IA ----------
+# ---------- Commandes et boutons : sans IA, instantané ----------
 def _ids(s):
     return [int(x) for x in re.findall(r"\d+", s)]
 
 
 def _raccourci(t: str) -> bool:
-    b = t.lower().strip(" !.?")
-    attente = [r["id"] for r in db.q("SELECT id FROM offres WHERE statut='a_valider'")]
+    b = t.lower().strip(" !.?").replace("é", "e").replace("è", "e")
+    b = b.lstrip("/")                              # /stats, /aide… (menu Telegram)
+    attente = [r["id"] for r in db.q("SELECT id FROM offres WHERE statut='a_valider' ORDER BY score DESC")]
     rdv_ouverts = db.q("SELECT id FROM rdv WHERE statut='propose'")
     if b in ("stats", "bilan", "statistiques"):
         messagerie.dire(rapporteur.stats())
-    elif b in ("aide", "help", "?"):
+    elif b in ("aide", "help", "start", "commandes"):
         messagerie.dire(AIDE)
     elif b in ("pause", "stop"):
         db.kv_set("pause", True)
-        messagerie.dire("⏸️ En pause. Dis « reprendre » quand tu veux.")
-    elif b in ("reprendre", "go", "relance", "reprends"):
+        messagerie.dire("⏸️ En pause : plus aucune recherche ni envoi. « reprendre » quand tu veux.")
+    elif b in ("reprendre", "reprends", "go"):
         db.kv_set("pause", False)
         messagerie.dire("▶️ C'est reparti.")
-    elif re.fullmatch(r"(montre|details?|détails?|voir)\s+\d+", b):
+    elif b in ("cherche", "recherche", "cherche maintenant", "scan"):
+        from .. import orchestrateur
+        messagerie.dire("🔎 Je lance une recherche complète maintenant. Je te montre ce que je trouve.")
+        orchestrateur.declencher()
+    elif m := re.fullmatch(r"mode\s+(repetition|validation|auto)", b):
+        _changer_mode(m.group(1))
+    elif b in ("mode",):
+        messagerie.dire(f"Mode actuel : {MODES[config.regles_envoi()['mode']]}",
+                        [[("🧪 Répétition", "mode repetition"), ("✋ Validation", "mode validation"),
+                          ("🚀 Auto", "mode auto")]])
+    elif m := re.fullmatch(r"(essai|teste|test)\s+(https?://\S+)", t.strip(), re.I):
+        _fond(_essai, m.group(2))
+    elif re.fullmatch(r"(montre|details?|voir|lettre)\s+\d+", b):
         details(_ids(b)[0])
     elif re.fullmatch(r"fait\s+[\d ,et]+", b):
         _fait(_ids(b))
-    elif attente and not rdv_ouverts and re.fullmatch(r"(ok|oui|valide|go|envoie)( tout| tous| toutes)?", b):
+    elif re.fullmatch(r"vrai\s+\d+", b):
+        _vrai(_ids(b)[0])
+    elif re.fullmatch(r"(ecarte|non|retire)\s+[\d ,et]+", b):
+        ecarter(_ids(b))
+        messagerie.dire("👌 Écartée(s).")
+    elif m := re.fullmatch(r"rdv\s+(\d+)\s+(oui|non|autre)", b):
+        rid, choix = int(m.group(1)), m.group(2)
+        if choix == "oui":
+            _fond(secretaire.confirmer, rid)
+        elif choix == "non":
+            _fond(secretaire.decliner, rid)
+        else:
+            db.kv_set("attente_dispo", rid)
+            messagerie.dire("📆 Quelles sont tes disponibilités ? (ex. « mardi ou jeudi après 14h »)")
+    elif re.fullmatch(r"(ok|valide|envoie|go)\s+[\d ,et]+", b) and not b.startswith(("ok sauf", "ok tout")):
+        valider(_ids(b))
+    elif attente and not rdv_ouverts and re.fullmatch(r"(ok|oui|valide|envoie)( tout| tous| toutes)?", b):
         valider(attente)
     elif attente and re.fullmatch(r"(ok|valide|envoie)( tout)? sauf [\d ,et]+", b):
         sauf = set(_ids(b))
@@ -105,7 +160,7 @@ def _raccourci(t: str) -> bool:
     return True
 
 
-# ---------- IA pour le reste ----------
+# ---------- Phrase libre : IA rapide ----------
 def _contexte():
     attente = [dict(r) for r in db.q("SELECT id, titre, entreprise, ville, score FROM offres WHERE statut='a_valider'")]
     rdv = [dict(r) for r in db.q("SELECT id, email_id, entreprise, debut, lieu FROM rdv WHERE statut='propose'")]
@@ -113,7 +168,8 @@ def _contexte():
                  for r in db.q("SELECT * FROM emails_recus WHERE categorie='question' AND traite=0")]
     manuelles = [dict(r) for r in db.q("SELECT id, entreprise, url FROM offres WHERE statut='manuelle'")]
     return {"en_attente_de_validation": attente, "rdv_proposes": rdv, "questions_recruteurs": questions,
-            "a_postuler_via_site": manuelles, "en_pause": db.kv_get("pause", False)}
+            "a_postuler_via_site": manuelles, "en_pause": db.kv_get("pause", False),
+            "mode_envoi": config.regles_envoi()["mode"]}
 
 
 def _ia(texte: str):
@@ -122,7 +178,7 @@ def _ia(texte: str):
                          json.dumps({"contexte": _contexte(), "historique": db.historique(8), "message": texte},
                                     ensure_ascii=False), SCHEMA, max_tokens=700)
     except llm.BudgetDepasse as e:
-        return messagerie.dire(f"⏸️ {e}. Les envois sans IA continuent ; on reprend demain.")
+        return messagerie.dire(f"⏸️ {e}. Les commandes et boutons marchent toujours ; l'IA reprend demain.")
     a, ids = d["action"], d.get("ids") or []
     try:
         if a == "valider":
@@ -132,19 +188,25 @@ def _ia(texte: str):
         elif a == "details" and ids:
             return details(ids[0])
         elif a == "confirmer_rdv" and d.get("rdv_id"):
-            return secretaire.confirmer(d["rdv_id"], d.get("creneau"))
+            return _fond(secretaire.confirmer, d["rdv_id"], d.get("creneau"))
         elif a == "autre_date" and d.get("rdv_id"):
-            return secretaire.autre_date(d["rdv_id"], d.get("texte") or texte)
+            return _fond(secretaire.autre_date, d["rdv_id"], d.get("texte") or texte)
         elif a == "decliner_rdv" and d.get("rdv_id"):
-            return secretaire.decliner(d["rdv_id"])
+            return _fond(secretaire.decliner, d["rdv_id"])
         elif a == "repondre_recruteur" and d.get("email_id"):
-            return secretaire.repondre_question(d["email_id"], d.get("texte") or texte)
+            return _fond(secretaire.repondre_question, d["email_id"], d.get("texte") or texte)
         elif a == "objectif":
             return coach.parler(texte)
         elif a == "profil":
             return coach.completer_profil(texte)
+        elif a == "style":
+            return noter_style(d.get("texte") or texte)
         elif a == "fait":
             return _fait(ids)
+        elif a == "chercher":
+            return _raccourci("cherche")
+        elif a == "essai" and re.search(r"https?://\S+", texte):
+            return _fond(_essai, re.search(r"https?://\S+", texte).group(0))
         elif a in ("stats", "aide", "pause", "reprendre"):
             return _raccourci(a)
     except Exception as e:
@@ -158,12 +220,19 @@ def valider(ids):
     n = 0
     for i in ids:
         o = db.q1("SELECT statut FROM offres WHERE id=?", i)
-        if o and o["statut"] == "a_valider":
+        if o and o["statut"] in ("a_valider", "repetee"):
             db.changer_statut(i, "validee", "concierge")
             n += 1
+    if not n:
+        return messagerie.dire("Rien à valider de ce côté 🤔")
     from .. import orchestrateur
-    messagerie.dire(f"✅ {n} candidature(s) validée(s). Je les envoie une par une, en heures de bureau, "
-                    "pour ne pas finir en spam.")
+    mode = config.regles_envoi()["mode"]
+    if mode == "repetition":
+        msg = f"🧪 {n} candidature(s) validée(s) : je te les envoie dans TA boîte mail pour vérifier (répétition)."
+    else:
+        msg = (f"✅ {n} candidature(s) validée(s). Elles partent une par une, aux heures de bureau "
+               "(le matin d'abord : c'est là qu'il y a le plus de réponses).")
+    messagerie.dire(msg)
     orchestrateur.envoyer_bientot()
 
 
@@ -178,11 +247,47 @@ def details(i):
     o = db.q1("SELECT * FROM offres WHERE id=?", i)
     if not o:
         return messagerie.dire(f"Pas d'offre n°{i}.")
-    messagerie.dire(f"*{o['titre']}* — {o['entreprise'] or '?'} ({o['ville'] or '?'})\n"
-                    f"{o['score'] or '?'}/10 · {o['raison'] or ''}\n{o['url']}\n\n"
-                    f"✉️ Objet : {o['objet_mail'] or '—'}\n\n{(o['lettre'] or '(lettre pas encore écrite)')[:1500]}")
+    texte, boutons = carte(o)
+    messagerie.dire(f"{texte}\n{o['url']}\n\n✉️ *{o['objet_mail'] or '—'}*\n{o['corps_mail'] or ''}\n\n— Lettre —\n"
+                    f"{(o['lettre'] or '(pas encore écrite)')[:2800]}",
+                    boutons if o["statut"] in ("a_valider", "repetee") else None)
     if o["lettre"]:
         messagerie.fichier(chemin_lettre(i), "Lettre de motivation")
+    if o["statut"] in ("a_valider", "repetee"):
+        messagerie.dire("Pas parfaite ? Dis-moi ce qui ne va pas (« trop longue », « parle plus de mon mémoire »…), "
+                        "je retiens pour toutes les prochaines lettres.")
+
+
+def noter_style(remarque: str):
+    """Tes remarques de style s'appliquent à TOUTES les lettres suivantes (apprentissage continu)."""
+    f = config.PROFIL_DIR / "style.md"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(f"- {remarque.strip()}\n")
+    messagerie.dire("✍️ Noté : toutes les prochaines lettres en tiendront compte.")
+
+
+def _changer_mode(mode: str):
+    o = config.objectif()
+    o.setdefault("envoi", {})["mode"] = mode
+    config.sauver_objectif(o)
+    messagerie.dire(MODES[mode])
+
+
+def _vrai(i):
+    o = db.q1("SELECT statut FROM offres WHERE id=?", i)
+    if not o or o["statut"] != "repetee":
+        return messagerie.dire("Cette candidature n'est pas en répétition.")
+    db.kv_set("envoi_reel_ids", sorted(set(db.kv_get("envoi_reel_ids", [])) | {i}))
+    db.changer_statut(i, "validee", "concierge", "envoi réel demandé")
+    messagerie.dire("🚀 OK, celle-ci part pour de vrai au cabinet (aux heures de bureau).")
+    from .. import orchestrateur
+    orchestrateur.envoyer_bientot()
+
+
+def _essai(url):
+    from .essai import essayer
+    essayer(url)
 
 
 def _fait(ids):
@@ -192,4 +297,4 @@ def _fait(ids):
         if o and o["statut"] == "manuelle":
             db.changer_statut(i, "envoyee", "concierge", "postulé via le site",
                               envoye_le=datetime.now().isoformat(" ", "seconds"))
-    messagerie.dire("👍 Noté.")
+    messagerie.dire("👍 Noté, je suis la réponse.")

@@ -1,5 +1,6 @@
-"""Agent 7 — Enquêteur : 2-3 faits vérifiés sur l'employeur + email de recrutement manquant.
-Il ne travaille que pour les meilleures offres (score ≥ 8) : c'est là que la personnalisation paie."""
+"""Agent Enquêteur : 2-3 faits vérifiés sur l'employeur + email de recrutement manquant.
+Il travaille pour les meilleures offres (score ≥ 8, la personnalisation paie) et pour toute offre
+retenue sans email (trouver l'adresse = pouvoir postuler par email au lieu d'un formulaire)."""
 from __future__ import annotations
 
 import json
@@ -20,19 +21,19 @@ SCHEMA = {
 def enqueter(score_min: int = 8):
     for o in db.q("SELECT * FROM offres WHERE statut='qualifiee' AND infos_cabinet IS NULL"):
         infos = {"faits": [], "destinataire": None}
-        if (o["score"] or 0) >= score_min and o["entreprise"]:
+        if o["entreprise"] and ((o["score"] or 0) >= score_min or not o["email_contact"]):
             try:
                 r = llm.demander("enqueteur", "rapide", llm.prompt("enqueteur"),
                                  json.dumps({"employeur": o["entreprise"], "ville": o["ville"],
                                              "poste": o["titre"], "url_offre": o["url"],
                                              "email_connu": o["email_contact"]}, ensure_ascii=False),
-                                 SCHEMA, web=True, recherches_max=2, max_tokens=1200)
+                                 SCHEMA, web=True, recherches_max=2, max_tokens=1200, priorite="fond")
                 infos = {"faits": r.get("faits", []), "destinataire": r.get("destinataire")}
                 email = outils.emails_dans(r.get("email_recrutement") or "")
                 if email and not o["email_contact"]:
                     db.maj(o["id"], email_contact=email[0], mode_candidature="email")
             except llm.BudgetDepasse:
-                return
+                pass          # budget « fond » épuisé : on écrit quand même la lettre, sans enquête
             except Exception as e:
                 db.journal("enqueteur", f"échec : {e}", o["id"])
         db.maj(o["id"], infos_cabinet=json.dumps(infos, ensure_ascii=False))

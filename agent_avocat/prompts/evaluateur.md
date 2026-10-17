@@ -11,5 +11,10 @@ Pour chaque offre :
 2. Sinon, note l'adéquation de 1 à 10 :
    9-10 = taillée pour elle · 7-8 = bon match · 5-6 = moyen · 1-4 = à éviter.
 3. `raison` : UNE phrase concrète (ce qui colle / ce qui bloque).
+4. `pourquoi` : 2 ou 3 liens PRÉCIS entre un élément réel du profil et un besoin de l'offre
+   (ex. « mémoire en droit de la copropriété ↔ dossiers de copropriété »). Le Rédacteur s'en servira.
+
+Offres `source: spontanee` : il n'y a pas d'offre publiée. Note l'adéquation entre le profil et l'employeur
+(matières, taille, ville, langue) avec la même exigence.
 
 Sois exigeant : mieux vaut 5 candidatures parfaites que 50 au hasard.

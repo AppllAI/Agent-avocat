@@ -93,6 +93,10 @@ def relever():
         if db.q1("SELECT 1 FROM emails_recus WHERE uid=?", uid):
             continue
         exp, sujet, corps = _dec(msg.get("From")), _dec(msg.get("Subject")), _corps(msg)[:5000]
+        moi = (config.env("EMAIL_ADRESSE") or "").lower()
+        if moi and moi in exp.lower():          # nos propres emails (répétitions, copies) : ignorés, 0 token
+            _stocker(uid, None, exp, sujet, corps, "autre", {})
+            continue
         offre_id = _relier(msg, exp)
         if offre_id is None and not MOTS.search(f"{sujet} {corps[:1500]}"):
             _stocker(uid, None, exp, sujet, corps, "autre", {})

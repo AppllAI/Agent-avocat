@@ -1,4 +1,4 @@
-# Ton objectif. Le Coach le remplit avec toi sur WhatsApp, mais tu peux aussi l'éditer à la main.
+# Ton objectif. Le Coach le remplit avec toi sur Telegram, mais tu peux aussi l'éditer à la main.
 # Les règles "uniquement" / "exclues" sont STRICTES : une offre qui les viole n'est jamais postulée.
 
 domaine_actif: droit_belge
@@ -24,10 +24,16 @@ domaines:
     pages_a_surveiller: []
 
 envoi:
-  mode: validation        # validation = tu valides sur WhatsApp · auto = envoi direct
-  max_par_jour: 15
-  score_minimum: 7        # sur 10
-  heures_envoi: [8, 19]   # n'envoie qu'en journée (heure belge)
+  # repetition = TEST : tout est réel (recherche, lettres, PDF) mais les emails partent vers TA boîte,
+  #              jamais vers les cabinets. Tu vois exactement ce qui serait parti.
+  # validation = réel, tu valides chaque candidature d'un bouton sur Telegram.
+  # auto       = réel, envoi direct des candidatures que le Juge a notées ≥ 8/10.
+  mode: repetition
+  max_par_jour: 20
+  score_minimum: 7               # adéquation offre / toi, sur 10
+  note_lettre_minimum: 8         # qualité de la lettre selon le Juge, sur 10
+  heures_envoi: [8, 17]          # les candidatures du matin ont plus de réponses (heure belge)
   jours_envoi: [0, 1, 2, 3, 4]   # lundi → vendredi
   relance_apres_jours: 8
   delai_meme_cabinet_jours: 60   # jamais 2 candidatures au même cabinet dans ce délai
+  candidatures_spontanees_par_jour: 5   # cabinets contactés sans offre publiée (0 pour désactiver)

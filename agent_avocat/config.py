@@ -74,14 +74,21 @@ def sauver_objectif(o: dict) -> None:
 
 
 def regles_envoi() -> dict:
-    defaut = {"mode": "validation", "max_par_jour": 15, "score_minimum": 7,
-              "heures_envoi": [8, 19], "jours_envoi": [0, 1, 2, 3, 4],
-              "relance_apres_jours": 8, "delai_meme_cabinet_jours": 60}
+    defaut = {"mode": "repetition", "max_par_jour": 20, "score_minimum": 7, "note_lettre_minimum": 8,
+              "heures_envoi": [8, 17], "jours_envoi": [0, 1, 2, 3, 4],
+              "relance_apres_jours": 8, "delai_meme_cabinet_jours": 60,
+              "candidatures_spontanees_par_jour": 5}
     defaut.update(objectif().get("envoi") or {})
     return defaut
 
 
 # ---------- Profil ----------
+def style_texte() -> str:
+    """Tes retours sur le style des lettres (« trop formel », « plus court »…), appris au fil du temps."""
+    f = PROFIL_DIR / "style.md"
+    return f.read_text(encoding="utf-8") if f.exists() else ""
+
+
 def profil_texte() -> str:
     f = PROFIL_DIR / "profil.md"
     return f.read_text(encoding="utf-8") if f.exists() else ""

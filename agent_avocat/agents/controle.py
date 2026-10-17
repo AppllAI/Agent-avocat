@@ -1,0 +1,52 @@
+"""Agent Contrôleur — dernier filet de sécurité AVANT chaque envoi, sans IA (gratuit, infaillible).
+
+Il attrape les erreurs qui ruinent une candidature et qu'une IA peut laisser passer :
+mauvais nom de cabinet, nom d'un AUTRE cabinet copié, texte à trous, pièce jointe manquante…"""
+from __future__ import annotations
+
+import re
+
+from .. import config, db, outils
+from .redacteur import chemin_lettre
+
+TROUS = re.compile(r"\[[^\]]{0,40}\]|\bX{3,}\b|<[^>@\s]{2,30}>|\{\w+\}|\bTODO\b|nom du cabinet|nom de l'employeur", re.I)
+MOTS_VIDES = {"cabinet", "avocats", "avocat", "associes", "associés", "law", "firm", "scrl", "srl", "sprl", "bv",
+              "the", "les", "des", "and", "partners", "legal", "advocaten"}
+
+
+def _jetons(nom: str) -> list[str]:
+    return [m for m in re.findall(r"[a-z0-9]+", outils.sans_accents(nom)) if len(m) >= 4 and m not in MOTS_VIDES]
+
+
+def problemes(o) -> list[str]:
+    o = dict(o)
+    p = []
+    lettre, corps, objet = o.get("lettre") or "", o.get("corps_mail") or "", o.get("objet_mail") or ""
+    if not (lettre and corps and objet):
+        return ["lettre ou email vide"]
+    tout = outils.sans_accents(f"{objet}\n{corps}\n{lettre}")
+    if o.get("entreprise"):
+        j = _jetons(o["entreprise"])
+        if j and not any(x in tout for x in j):
+            p.append(f"le nom « {o['entreprise']} » n'apparaît pas dans la lettre")
+    propres = set(_jetons(o.get("entreprise") or ""))
+    for r in db.q("SELECT DISTINCT entreprise FROM offres WHERE entreprise IS NOT NULL AND id<>?", o["id"]):
+        autres = [x for x in _jetons(r["entreprise"]) if x not in propres and len(x) >= 5]
+        if autres and all(re.search(rf"\b{re.escape(x)}\b", tout) for x in autres):
+            p.append(f"mentionne un autre employeur : « {r['entreprise']} »")
+            break
+    if TROUS.search(lettre) or TROUS.search(corps):
+        p.append(f"texte à trous : « {(TROUS.search(lettre) or TROUS.search(corps)).group(0)} »")
+    mots = len(lettre.split())
+    if not 180 <= mots <= 450:
+        p.append(f"longueur anormale ({mots} mots)")
+    if o.get("email_contact") and not outils.RE_EMAIL.fullmatch(o["email_contact"].strip()):
+        p.append("adresse du destinataire invalide")
+    if not config.chemin_cv().exists():
+        p.append("CV manquant")
+    if not chemin_lettre(o["id"]).exists():
+        p.append("PDF de la lettre manquant")
+    nom = (config.env("NOM_CANDIDAT") or "").strip()
+    if nom and nom.split()[-1].lower() not in (lettre + corps).lower():
+        p.append("ta signature (nom) n'apparaît pas")
+    return p

@@ -51,17 +51,25 @@ def _api():
     return _client
 
 
+# Part du budget que les tâches de FOND (recherche, prospection, enquête) peuvent consommer.
+# Le reste est réservé à l'essentiel (écrire les lettres, te répondre, gérer les rendez-vous).
+PART_FOND = 0.7
+
+
 def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
-             web: bool = False, recherches_max: int = 5, max_tokens: int = 1500) -> dict:
-    """Pose une question à l'IA et renvoie un dict conforme à `schema`."""
+             web: bool = False, recherches_max: int = 5, max_tokens: int = 1500,
+             priorite: str = "essentiel") -> dict:
+    """Pose une question à l'IA et renvoie un dict conforme à `schema`.
+    priorite="fond" : s'arrête plus tôt dans la journée pour garder du budget pour l'essentiel."""
     if config.simulation():
         from . import simulation
 
         return simulation.repondre(agent, contenu, schema)
 
     budget = float(config.env("BUDGET_JOUR_EUR", "2"))
-    if depense_du_jour() >= budget:
-        raise BudgetDepasse(f"Budget du jour atteint ({budget} €)")
+    plafond = budget * (PART_FOND if priorite == "fond" else 1)
+    if depense_du_jour() >= plafond:
+        raise BudgetDepasse(f"Budget du jour atteint ({plafond:.2f} € pour les tâches {priorite})")
 
     outil = {"name": "repondre", "description": "Rends ta réponse finale structurée.", "input_schema": schema}
     tools = [outil]

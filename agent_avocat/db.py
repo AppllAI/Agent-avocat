@@ -5,8 +5,10 @@ de chaque offre (machine à états). C'est ce qui garde le système fiable et é
 aucun agent n'a besoin de relire l'historique des autres.
 
   decouverte ─► enrichie ─► qualifiee ─► redigee ─► a_valider ─► validee ─► envoyee ─► relancee
-       │            │           │            │                         │          │
-       └──────► ecartee ◄───────┘        manuelle (formulaire)         └──► refus / entretien
+       │            │           │            │                    │    │          │
+       └──────► ecartee ◄───────┘            │      repetee ◄─────┘    │          └──► refus / entretien
+                                             │   (mode répétition :    manuelle (formulaire)
+                                             │    envoyé à TOI seulement)
 """
 from __future__ import annotations
 
@@ -23,8 +25,9 @@ TRANSITIONS = {
     "enrichie": {"qualifiee", "ecartee", "erreur"},
     "qualifiee": {"redigee", "ecartee", "erreur"},
     "redigee": {"a_valider", "validee", "ecartee", "erreur"},
-    "a_valider": {"validee", "ecartee"},
-    "validee": {"envoyee", "manuelle", "erreur"},
+    "a_valider": {"validee", "ecartee", "qualifiee"},
+    "validee": {"envoyee", "manuelle", "repetee", "ecartee", "a_valider", "erreur"},
+    "repetee": {"validee", "ecartee"},
     "manuelle": {"envoyee", "ecartee"},
     "envoyee": {"relancee", "refus", "entretien"},
     "relancee": {"refus", "entretien", "sans_reponse"},
@@ -49,7 +52,10 @@ CREATE TABLE IF NOT EXISTS offres (
     cree_le TEXT DEFAULT CURRENT_TIMESTAMP,
     maj_le TEXT DEFAULT CURRENT_TIMESTAMP,
     envoye_le TEXT,
-    message_id TEXT                  -- Message-ID de notre email (pour relier les réponses)
+    message_id TEXT,                 -- Message-ID de notre email (pour relier les réponses)
+    publie_le TEXT,                  -- date de publication (fraîcheur = chances d'entretien)
+    pourquoi TEXT,                   -- les 2-3 arguments « pourquoi toi » trouvés par l'Évaluateur
+    note_lettre INTEGER              -- note du Juge /10
 );
 CREATE INDEX IF NOT EXISTS ix_offres_statut ON offres(statut);
 
@@ -93,7 +99,17 @@ def connexion() -> sqlite3.Connection:
             _c.row_factory = sqlite3.Row
             _c.execute("PRAGMA journal_mode=WAL")
             _c.executescript(SCHEMA)
+            _migrer(_c)
         return _c
+
+
+def _migrer(c):
+    """Ajoute les colonnes des nouvelles versions à une base existante (sans rien perdre)."""
+    existantes = {r[1] for r in c.execute("PRAGMA table_info(offres)")}
+    for col in ("publie_le TEXT", "pourquoi TEXT", "note_lettre INTEGER"):
+        if col.split()[0] not in existantes:
+            c.execute(f"ALTER TABLE offres ADD COLUMN {col}")
+    c.commit()
 
 
 @contextmanager

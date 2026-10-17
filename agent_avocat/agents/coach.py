@@ -41,10 +41,14 @@ def onboarding_fini() -> bool:
 
 
 def bienvenue():
-    messagerie.dire("👋 Salut ! Je suis ton agent de candidature. Je vais chercher les offres, écrire tes lettres, "
-                    "postuler et te prévenir uniquement quand il faut décider (un entretien, une question).\n\n"
-                    "Pour commencer, envoie-moi ton *CV en PDF* ici, et dis-moi (à l'écrit ou en vocal 🎙️) "
-                    "ce que tu cherches : quel poste, quelles matières de droit, où ?")
+    messagerie.dire("👋 Salut ! Je suis ton agent de candidature. Je cherche les offres en continu, j'écris une "
+                    "lettre sur mesure pour chacune, je postule et je ne te dérange que pour décider "
+                    "(une candidature à valider, un entretien).\n\n"
+                    "Pour commencer :\n1️⃣ envoie-moi ton *CV en PDF* ici\n"
+                    "2️⃣ dis-moi (écrit ou vocal 🎙️) ce que tu cherches : poste, matières de droit, villes, "
+                    "ce que tu ne veux surtout pas.\n\n"
+                    "On démarre en *mode répétition* 🧪 : tout est réel, mais les emails arrivent dans TA boîte, "
+                    "pas chez les cabinets. Tu passes en vrai quand tu es convaincu.")
 
 
 def parler(texte: str):

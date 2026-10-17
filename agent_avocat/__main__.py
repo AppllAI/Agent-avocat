@@ -5,6 +5,8 @@
   python -m agent_avocat --une-fois      un seul cycle complet (test)
   python -m agent_avocat --stats         bilan
   python -m agent_avocat --verifier      vérifie l'installation
+  python -m agent_avocat --essai URL     toute la chaîne sur une offre, sans rien envoyer
+  python -m agent_avocat --banc-essai    5 offres types → rapport qualité donnees/banc_essai.md (sans envoi)
 """
 from __future__ import annotations
 
@@ -42,7 +44,7 @@ def verifier():
             print("✅", role)
         except ImportError:
             print("➖", role, "non installé")
-    canal = config.env("CANAL", "console")
+    canal = config.env("CANAL", "telegram")
     print("   canal :", canal)
     if canal == "whatsapp":
         ligne(shutil.which("node") is not None, "Node.js (pont WhatsApp)", "installe Node 20+")
@@ -61,6 +63,8 @@ def main():
     p.add_argument("--une-fois", action="store_true")
     p.add_argument("--stats", action="store_true")
     p.add_argument("--verifier", action="store_true")
+    p.add_argument("--essai", metavar="URL")
+    p.add_argument("--banc-essai", action="store_true")
     a = p.parse_args()
     db.connexion()
     if a.verifier:
@@ -71,6 +75,12 @@ def main():
         return print(stats())
     if a.une_fois:
         return orchestrateur.un_cycle()
+    if a.essai:
+        from .agents.essai import essayer
+        return essayer(a.essai)
+    if a.banc_essai:
+        from .agents.essai import banc_essai
+        return print("Rapport :", banc_essai())
     from .canaux import choisir
     orchestrateur.demarrer(choisir(a.canal))
 

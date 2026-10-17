@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
@@ -45,16 +45,23 @@ def proposer(email_id: int, offre_id: int | None, analyse: dict):
     employeur = analyse.get("employeur") or (db.q1("SELECT entreprise FROM offres WHERE id=?", offre_id) or
                                              {"entreprise": "Un recruteur"})["entreprise"]
     creneaux = analyse.get("creneaux") or [None]
-    lignes = []
+    lignes, choix = [], []
     with db.tx() as c:
         for iso in creneaux:
             rid = c.execute("INSERT INTO rdv (offre_id, email_id, entreprise, debut, lieu) VALUES (?,?,?,?,?)",
                             (offre_id, email_id, employeur, iso, analyse.get("lieu"))).lastrowid
             alerte = " ⚠️ conflit avec un autre rdv" if conflits(iso) else ""
-            lignes.append(f"• (rdv {rid}) {joli(iso)}{alerte}")
+            lignes.append(f"• {joli(iso)}{alerte}")
+            if iso:
+                choix.append((f"✅ {joli(iso).split(' à ')[0].split()[0].capitalize()} {joli(iso).split(' à ')[-1]}",
+                              f"rdv {rid} oui"))
+    premier = rid if len(creneaux) == 1 else rid - len(creneaux) + 1
+    boutons = [choix[i:i + 2] for i in range(0, len(choix), 2)] + \
+              [[("📆 Autre date", f"rdv {premier} autre"), ("❌ Décliner", f"rdv {premier} non")]]
     messagerie.dire(f"📅 *{employeur}* te propose un entretien !\n" + "\n".join(lignes) +
                     f"\n📍 {analyse.get('lieu') or 'lieu à préciser'}\n{analyse.get('resume', '')}\n\n"
-                    "Tu confirmes ? (« oui », « oui pour le 2e », « plutôt jeudi après-midi », « non »)")
+                    "Tu confirmes ? Touche un bouton, ou réponds en mots (« oui », « plutôt jeudi aprèm »…).",
+                    boutons)
 
 
 def _repondre(email_id: int, consigne: dict) -> None:
@@ -85,7 +92,7 @@ def ics(rdv) -> "Path":
     fmt = "%Y%m%dT%H%M%S"
     f.write_text("\r\n".join([
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//agent-avocat//FR", "BEGIN:VEVENT",
-        f"UID:rdv-{rdv['id']}@agent-avocat", f"DTSTAMP:{datetime.utcnow():%Y%m%dT%H%M%SZ}",
+        f"UID:rdv-{rdv['id']}@agent-avocat", f"DTSTAMP:{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}",
         f"DTSTART;TZID=Europe/Brussels:{d:{fmt}}", f"DTEND;TZID=Europe/Brussels:{d + timedelta(hours=1):{fmt}}",
         f"SUMMARY:Entretien – {rdv['entreprise']}", f"LOCATION:{rdv['lieu'] or ''}",
         "BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", "DESCRIPTION:Entretien", "END:VALARM",

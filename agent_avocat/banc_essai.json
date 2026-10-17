@@ -1,0 +1,22 @@
+[
+  {"url": "https://exemple.invalid/offre/1", "source": "essai", "titre": "Avocat stagiaire en droit immobilier",
+   "entreprise": "Cabinet Verhaegen & Lys (fictif)", "ville": "Bruxelles", "matiere": "droit immobilier", "contrat": "stage",
+   "langue": "français", "email_contact": "recrutement@exemple.invalid",
+   "description": "Cabinet de 12 avocats spécialisé en baux commerciaux, copropriété et promotion immobilière. Le stagiaire assistera les associés dans la rédaction de baux, d'actes de vente et de conclusions devant la justice de paix et le tribunal de première instance. Profil : master en droit, intérêt marqué pour l'immobilier, bonne plume. Connaissance du néerlandais est un atout."},
+  {"url": "https://exemple.invalid/offre/2", "source": "essai", "titre": "Juriste d'entreprise – droit des sociétés (CDI)",
+   "entreprise": "Groupe Meridia SA (fictif)", "ville": "Namur", "matiere": "droit des sociétés", "contrat": "CDI",
+   "langue": "français", "email_contact": "jobs@exemple.invalid",
+   "description": "Groupe industriel wallon (800 personnes). Le juriste suivra le secrétariat juridique de 15 filiales (assemblées, conseils d'administration, CSA), la rédaction de contrats commerciaux et le support aux opérations d'acquisition. 0-3 ans d'expérience."},
+  {"url": "https://exemple.invalid/offre/3", "source": "essai", "titre": "Collaborateur junior en droit social",
+   "entreprise": "Lambert Avocats (fictif)", "ville": "Liège", "matiere": "droit social", "contrat": "CDI",
+   "langue": "français", "email_contact": null,
+   "description": "Boutique de droit du travail côté employeurs : licenciements, restructurations, règlements de travail, contentieux devant le tribunal du travail. Candidature via le formulaire du site."},
+  {"url": "https://exemple.invalid/offre/4", "source": "spontanee", "titre": "Candidature spontanée – stagiaire avocat",
+   "entreprise": "Dewaele Avocats (fictif)", "ville": "Bruxelles", "matiere": "droit immobilier, urbanisme",
+   "email_contact": "info@exemple.invalid",
+   "description": "Candidature spontanée (aucune offre publiée). Cabinet actif en urbanisme, permis d'environnement et contentieux de la construction, notamment devant le Conseil d'État."},
+  {"url": "https://exemple.invalid/offre/5", "source": "essai", "titre": "Paralegal – Real Estate team",
+   "entreprise": "Hartley Ruys LLP (fictif)", "ville": "Bruxelles", "matiere": "real estate", "contrat": "CDI",
+   "langue": "anglais", "email_contact": "careers@exemple.invalid",
+   "description": "International firm seeks a paralegal for its Brussels real estate team: due diligence of property portfolios, data rooms, drafting of lease summaries. Fluent English required, French a plus."}
+]

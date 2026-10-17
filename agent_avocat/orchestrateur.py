@@ -1,10 +1,13 @@
-"""Le chef d'orchestre : du code simple, pas une IA (c'est gratuit et ça ne se trompe pas de chemin).
+"""Le chef d'orchestre : du code simple, pas une IA (gratuit, et il ne se trompe jamais de chemin).
 
-  Toutes les 3 h  : Éclaireurs → Extracteur → Garde → Évaluateur → Enquêteur → Rédacteur+Vérificateur
-                    → proposition du lot sur ta messagerie → Envoyeur
-  Toutes les 10 min : Trieur (boîte mail) → Secrétaire si entretien
-  Chaque jour       : Relanceur, bilan du soir
-  En permanence     : Concierge, qui écoute tes messages (traités dans l'ordre, un à la fois)
+  Toutes les 15 min  : Veille gratuite (LexGO, Indeed, pages suivies) → s'il y a du neuf, traitement immédiat
+  Toutes les heures  : Éclaireur web (7h-22h), 2 requêtes en parallèle → traitement
+  Chaque matin       : Prospecteur (candidatures spontanées) → traitement
+  Traitement         : Extracteur → Garde → Évaluateur → Enquêteur → Rédacteur ⇄ Juge → cartes sur Telegram
+  Toutes les 10 min  : Envoyeur (Contrôleur avant chaque email ; heures de bureau)
+  Toutes les 5 min   : Trieur (boîte mail) → Secrétaire si entretien
+  Toutes les heures  : Relanceur, Préparateur d'entretien (la veille), bilan du soir
+  En permanence      : Concierge, qui écoute tes messages ; le travail long part en arrière-plan
 """
 from __future__ import annotations
 
@@ -14,12 +17,13 @@ import time
 from datetime import datetime
 
 from . import config, db, messagerie
-from .agents import (coach, concierge, enqueteur, envoyeur, evaluateur, extracteur, garde, rapporteur,
-                     redacteur, relance, sources, trieur)
+from .agents import (coach, concierge, enqueteur, envoyeur, evaluateur, extracteur, garde, preparateur,
+                     prospecteur, rapporteur, redacteur, relance, sources, trieur)
 
-_pipeline = threading.Lock()
+_traitement = threading.Lock()
 _envoi = threading.Lock()
 _boite = threading.Lock()
+_recherche = threading.Lock()
 
 
 def _proteger(nom, f, *a):
@@ -29,28 +33,63 @@ def _proteger(nom, f, *a):
         db.journal("orchestre", f"{nom} a échoué : {type(e).__name__}: {e}")
 
 
+def en_pause() -> bool:
+    return bool(db.kv_get("pause", False))
+
+
 def pret() -> bool:
     return coach.onboarding_fini() or (config.OBJECTIF.exists() and bool(config.profil_texte().strip()))
 
 
-def pipeline():
-    if db.kv_get("pause", False) or not pret():
-        return
-    if not _pipeline.acquire(blocking=False):
+def en_fond(f, *a):
+    """Travail long hors du fil des messages : tu peux continuer à écrire pendant ce temps."""
+    threading.Thread(target=_proteger, args=(getattr(f, "__name__", "tâche"), f, *a), daemon=True).start()
+
+
+# ---------- étapes ----------
+def traitement():
+    """Fait avancer toutes les offres en attente jusqu'à la carte « prête à envoyer »."""
+    if en_pause() or not pret() or not _traitement.acquire(blocking=False):
         return
     try:
-        for nom, etape in (("éclaireurs", sources.chercher), ("extracteur", extracteur.enrichir),
-                           ("garde", garde.filtrer), ("évaluateur", evaluateur.evaluer),
-                           ("enquêteur", enqueteur.enqueter), ("rédacteur", redacteur.rediger),
-                           ("proposition", redacteur.proposer_lot)):
+        for nom, etape in (("extracteur", extracteur.enrichir), ("garde", garde.filtrer),
+                           ("évaluateur", evaluateur.evaluer), ("enquêteur", enqueteur.enqueter),
+                           ("rédacteur", redacteur.rediger), ("proposition", redacteur.proposer_lot)):
             _proteger(nom, etape)
-        _envoyer()
     finally:
-        _pipeline.release()
+        _traitement.release()
+    _envoyer()
+
+
+def veille():
+    if en_pause() or not pret():
+        return
+    nouvelles = _proteger("veille", sources.veille_gratuite) or 0
+    en_attente = db.q1("SELECT COUNT(*) AS n FROM offres WHERE statut IN ('decouverte','enrichie','qualifiee')")["n"]
+    if nouvelles or en_attente:
+        traitement()
+
+
+def recherche_web(force: bool = False):
+    h = datetime.now().hour
+    if en_pause() or not pret() or (not force and not 7 <= h < 22) or not _recherche.acquire(blocking=False):
+        return
+    try:
+        _proteger("éclaireur web", sources.recherche_web)
+    finally:
+        _recherche.release()
+    traitement()
+
+
+def prospection():
+    if en_pause() or not pret() or datetime.now().hour < 7:
+        return
+    if _proteger("prospecteur", prospecteur.prospecter):
+        traitement()
 
 
 def _envoyer():
-    if db.kv_get("pause", False):
+    if en_pause():
         return
     with _envoi:
         _proteger("envoyeur", envoyeur.envoyer)
@@ -65,33 +104,45 @@ def boite():
         _boite.release()
 
 
-def quotidien():
-    if db.kv_get("pause", False):
+def horaire():
+    _proteger("préparateur", preparateur.preparer)
+    if en_pause():
         return
     _proteger("relance", relance.relancer)
     if datetime.now().hour >= 19:
         _proteger("bilan", rapporteur.bilan_du_jour)
 
 
+def pipeline():
+    """Tout, tout de suite (commande « cherche », tests)."""
+    if en_pause() or not pret():
+        return
+    _proteger("veille", sources.veille_gratuite)
+    _proteger("éclaireur web", sources.recherche_web)
+    _proteger("prospecteur", prospecteur.prospecter)
+    traitement()
+
+
 def declencher():
-    threading.Thread(target=pipeline, daemon=True).start()
+    en_fond(pipeline)
 
 
 def envoyer_bientot():
-    threading.Thread(target=_envoyer, daemon=True).start()
-
-
-def _boucle(f, minutes):
-    while True:
-        f()
-        time.sleep(minutes * 60)
+    en_fond(_envoyer)
 
 
 def un_cycle():
     """Pour tester : un passage complet, sans attendre."""
     pipeline()
     boite()
-    quotidien()
+    horaire()
+
+
+def _boucle(f, minutes, decalage=0):
+    time.sleep(decalage)
+    while True:
+        _proteger(f.__name__, f)
+        time.sleep(minutes * 60)
 
 
 def demarrer(canal):
@@ -107,14 +158,19 @@ def demarrer(canal):
             file.task_done()
 
     threading.Thread(target=ouvrier, daemon=True).start()
-    for f, minutes in ((pipeline, config.env_int("INTERVALLE_RECHERCHE_MIN", 180)),
-                       (boite, config.env_int("INTERVALLE_BOITE_MIN", 10)),
-                       (quotidien, 60)):
-        threading.Thread(target=_boucle, args=(f, minutes), daemon=True).start()
+    rythme = config.env_int
+    for f, minutes, decalage in ((veille, rythme("INTERVALLE_VEILLE_MIN", 15), 5),
+                                 (recherche_web, rythme("INTERVALLE_WEB_MIN", 60), 60),
+                                 (prospection, 60, 120),
+                                 (_envoyer, 10, 30),
+                                 (boite, rythme("INTERVALLE_BOITE_MIN", 5), 10),
+                                 (horaire, 60, 90)):
+        threading.Thread(target=_boucle, args=(f, minutes, decalage), daemon=True).start()
 
     if not db.kv_get("bienvenue_envoyee"):
         db.kv_set("bienvenue_envoyee", True)
         coach.bienvenue()
-    db.journal("orchestre", f"démarré · canal {canal.nom} · {'SIMULATION' if config.simulation() else 'réel'}")
+    db.journal("orchestre", f"démarré · canal {canal.nom} · mode {config.regles_envoi()['mode']}"
+                            f"{' · SIMULATION' if config.simulation() else ''}")
     canal.ecouter(file.put)   # bloquant
     file.join()               # fin de session : on finit de traiter les messages reçus

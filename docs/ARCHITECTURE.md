@@ -1,68 +1,92 @@
-# Architecture — pourquoi c'est construit comme ça
+# Comment ça marche
 
-## Ce qu'on a retenu des meilleurs projets publics
+## Ce sur quoi on s'appuie
 
-| Source | Ce qu'on reprend | Ce qu'on évite |
-|---|---|---|
-| **Anthropic — *Building effective agents* / *Multi-agent research system* / *When to use multi-agent*** | Préférer des **workflows** simples (code) aux agents autonomes ; motifs *routing*, *prompt chaining*, *evaluator-optimizer* ; découper **par contexte**, pas par métier ; un vérificateur au regard neuf ; consignes claires par agent (objectif, format de sortie, limites). | Le multi-agent coûte 3 à 15× plus de tokens : on ne lance pas 15 IA qui discutent entre elles. |
-| **AIHawk** (~30 k ⭐, AGPL) — l'agent de candidature le plus populaire | Profil candidat comme seule source de vérité ; filtres explicites ; lettre par offre. | Le remplissage automatique de LinkedIn (interdit par leurs CGU, comptes bannis). Aucun code AGPL copié. |
-| **ApplyPilot** (AGPL) | Pipeline en étapes avec statut en base ; **enrichissement en cascade** (JSON-LD → regex → IA) ; score par bandes ; modèle rapide pour noter / modèle qualité pour écrire ; anti-fabrication avec relecture ; jamais deux fois le même employeur ; tri Gmail refus/entretien. | Idées seulement, pas de code (licence AGPL). |
-| **JobSpy** (~4,5 k ⭐, MIT) | Utilisé tel quel comme dépendance optionnelle pour Indeed Belgique, sans IA. | — |
-| **NanoClaw** | Agent personnel piloté par WhatsApp, vocaux transcrits par Whisper et passés à l'agent sous forme de texte. | — |
-| **Baileys** | Librairie WhatsApp open source la plus utilisée, sans navigateur (plus légère que whatsapp-web.js). | — |
+| Source | Ce qu'on en tire |
+|---|---|
+| **Talent Works** (1 600 candidatures) | Postuler dans les **4 premiers jours** d'une offre multiplie jusqu'à ×8 les chances d'entretien ; après ~10 jours, ~1,5 %. Le **matin** (6h-10h) donne le plus de réponses. → veille toutes les 15 min, offres fraîches traitées en premier, envois à partir de 8h. |
+| **ResumeGo** (7 287 candidatures, 236 recruteurs) | Une lettre **personnalisée** : **+53 %** de rappels par rapport à pas de lettre. → Évaluateur qui trouve les liens « pourquoi toi », Enquêteur qui trouve des faits sur le cabinet, Juge qui refuse les lettres banales. |
+| **Terrain (stage en cabinet)** | La candidature spontanée est le canal principal ; timing, ciblage et relance font la différence ; un associé lit un CV en quelques secondes. → Prospecteur quotidien, Relanceur, lettres de 250-330 mots. |
+| **Anthropic** (*Building effective agents*, *multi-agent research system*, *when to use multi-agent*) | Workflows simples codés plutôt qu'IA qui discutent entre elles (3 à 15× plus de tokens) ; découpe par contexte ; routeur ; boucle écrire → noter → corriger ; vérificateur au regard neuf. |
+| **AIHawk** (~30 k ⭐), **ApplyPilot** | Profil = seule source de vérité ; enrichissement JSON-LD → regex → IA ; modèle rapide pour noter, qualité pour écrire ; anti-invention ; jamais deux fois le même employeur. Idées seulement (licence AGPL). |
+| **LexGO** | API publique et gratuite des offres juridiques belges, prévue pour les agents → source principale, sans IA. |
 
-## Le schéma
+## Le circuit (qui parle à qui)
+
+Les agents ne bavardent pas entre eux : chacun lit les offres qui sont à **son** étape dans la base,
+fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **Concierge** te parle.
 
 ```
-                    ┌──────────── Concierge (routeur) ◄── toi : texte · vocal (Transcripteur) · PDF (Profileur)
-                    │                  │
-                    │       Coach ◄────┘ (définit l'objectif = règles strictes)
-                    ▼
- Éclaireurs ─► Extracteur ─► Garde ─► Évaluateur ─► Enquêteur ─► Rédacteur ⇄ Vérificateur ─► [ton ok] ─► Envoyeur
- (Indeed, web, (JSON-LD,     (règles  (note /10,    (faits sur    (lettre +     (anti-invention,              (heures de
-  pages suivies) regex, IA)  sans IA) par lots)     l'employeur)   email)        2 corrections max)            bureau, plafond)
-                                                                                                                  │
- Relanceur (J+8, sans IA) ◄─────────────────────────────────────────────────────────────────────────────────────┘
- Trieur (boîte mail) ─► refus : silence · question : toi · entretien ─► Secrétaire ─► toi ─► email + .ics
- Rapporteur : stats, bilan du soir, coût IA
+ ┌── TROUVER ───────────────────────────────────────────────┐
+ │ LexGO · Indeed · pages suivies (gratuit, toutes les 15 min)│
+ │ Éclaireur web (IA, toutes les heures)                      │──► offre « découverte »
+ │ Prospecteur : cabinets à contacter spontanément (chaque matin)
+ └───────────────────────────────────────────────────────────┘
+ ┌── TRIER ──────────────────────────────────────────────────┐
+ │ Extracteur : complète l'offre (description, email, matière)│
+ │ Garde : TES règles strictes, sans IA (« pas de pénal »)    │──► écartée, ou
+ │ Évaluateur : adéquation /10 + 2-3 arguments « pourquoi toi »│──► « qualifiée »
+ └───────────────────────────────────────────────────────────┘
+ ┌── ÉCRIRE ─────────────────────────────────────────────────┐
+ │ Enquêteur : faits sur le cabinet + email de recrutement    │
+ │ Rédacteur ⇄ Juge : lettre + email, notés /10, 3 essais max │──► carte sur Telegram
+ └───────────────────────────────────────────────────────────┘      [✅ Envoyer] [👁 Lettre] [❌ Non]
+ ┌── ENVOYER ────────────────────────────────────────────────┐
+ │ Contrôleur : mauvais nom de cabinet ? texte à trous ? PJ ? │
+ │ Envoyeur : répétition → TA boîte ; sinon → le cabinet      │
+ │ Relanceur : une relance polie à J+8                        │
+ └───────────────────────────────────────────────────────────┘
+ ┌── RÉPONSES ───────────────────────────────────────────────┐
+ │ Trieur : refus → silence · question → toi · entretien →    │
+ │ Secrétaire : [✅ Jeudi 16h30] [📆 Autre date] → répond au   │
+ │             cabinet + .ics pour ton agenda                 │
+ │ Préparateur : la veille, fiche d'entretien                 │
+ └───────────────────────────────────────────────────────────┘
+ Concierge ⇄ toi (Telegram) · Coach (ton objectif) · Profileur (ton CV) · Transcripteur (vocaux)
+ Rapporteur (stats, bilan du soir) · Essayeur (tests sans envoi)
 ```
 
-Les agents **ne discutent pas entre eux** : ils se passent le relais via le **statut** de chaque offre
-(`db.py`, transitions vérifiées). Chaque agent reçoit uniquement ce dont il a besoin → contexte court,
-coût bas, et un agent qui plante ne bloque pas les autres (il reprend au cycle suivant).
+**23 agents**, dont 9 sans IA. L'IA rapide (Haiku) trie, note, juge, comprend tes messages ;
+l'IA qualité (Sonnet) écrit ce que les recruteurs liront et prépare tes entretiens.
 
-## Les 18 agents et leur coût
+## Ce qui se passe quand tu lances l'application
 
-| # | Agent | IA | Rôle |
-|---|---|---|---|
-| 1-3 | Éclaireurs (Indeed, pages suivies, web) | web = rapide, le reste gratuit | trouvent les offres, en parallèle, dédoublonnées |
-| 4 | Extracteur | gratuit sauf champs manquants | complète l'offre |
-| 5 | Garde | **gratuit** | tes règles strictes (synonymes : « correctionnel » = pénal) |
-| 6 | Évaluateur | rapide, 8 offres / appel | note /10 |
-| 7 | Enquêteur | rapide + 2 recherches, offres ≥ 8 seulement | personnalisation |
-| 8 | Rédacteur | **qualité** | lettre + email |
-| 9 | Vérificateur | rapide | relit, bloque les inventions |
-| 10 | Envoyeur | **gratuit** | SMTP, rythme humain |
-| 11 | Trieur | rapide, seulement si email lié à une candidature | classe les réponses |
-| 12 | Secrétaire | rapide | rendez-vous, réponses, .ics |
-| 13 | Relanceur | **gratuit** | une relance polie |
-| 14 | Rapporteur | **gratuit** | stats, coûts |
-| 15 | Coach | rapide | interview de départ, modifications d'objectif |
-| 16 | Profileur | qualité, une fois | CV → fiche profil |
-| 17 | Transcripteur | Whisper local gratuit ou API | vocaux |
-| 18 | Concierge | gratuit pour les commandes simples, sinon rapide | comprend tes messages |
+1. Elle lit tes réglages (email, clé API, Telegram) et démarre les agents en arrière-plan.
+2. Premier lancement : le Coach t'écrit sur Telegram, te demande ton CV et ce que tu cherches.
+3. Ensuite, sans rien faire de ta part : veille toutes les 15 min, recherche web toutes les heures,
+   prospection chaque matin, boîte mail toutes les 5 min, envois toutes les 10 min en heures de bureau.
+4. Tu reçois une notification seulement quand il y a une décision : une candidature prête, un entretien,
+   une question d'un recruteur, une offre à postuler via un site. Le soir, un petit bilan.
 
-**Leviers d'économie** : modèle rapide partout sauf l'écriture · sortie forcée par outil (pas de JSON cassé,
-pas de bavardage) · prompt système en cache · évaluation par lots · filtres sans IA en premier ·
-recherche web en rotation (1 requête / cycle) · budget journalier en € (`BUDGET_JOUR_EUR`).
-Ordre de grandeur : quelques centimes par candidature envoyée.
+## Telegram : réactivité
 
-## Ajouter un domaine (ex. finance au Luxembourg)
+- Bouton touché ou commande (« ok 12 », « stats ») → réponse **immédiate**, sans IA.
+- Phrase libre → « … écrit » s'affiche tout de suite, réponse en 2-5 secondes.
+- Vocal → transcrit (« 🎙️ « … » ») puis traité comme un texte.
+- Travail long (envoyer, chercher, essai, lire le CV) → « ⏳ » tout de suite, il travaille en
+  arrière-plan, tu reçois une **notification** quand c'est fini. Tu peux fermer Telegram entre-temps.
 
-Un nouveau bloc dans `config/objectif.yaml` → `domaine_actif`. Les prompts sont dans `agent_avocat/prompts/` :
-le seul qui parle de droit belge est `eclaireur_web.md` (sites à cibler) et `redacteur.md` (conventions de lettre).
+## La phase de test (avant d'écrire au moindre cabinet)
 
-## Tester
+1. **Banc d'essai** — `python -m agent_avocat --banc-essai` : 5 offres types → `donnees/banc_essai.md`
+   avec chaque lettre, sa note et les remarques du Juge. Coût ≈ 0,20 €. Tu juges la qualité à froid.
+2. **Essai d'une vraie offre** — sur Telegram : `essai https://…` → toute la chaîne sur cette offre,
+   résultat et lettre PDF, **rien n'est envoyé**.
+3. **Mode répétition** (par défaut) — tout tourne pour de vrai, mais chaque email arrive dans **ta**
+   boîte avec l'objet `[RÉPÉTITION → adresse du cabinet]`, pièces jointes comprises. Bouton
+   « 🚀 L'envoyer pour de vrai » sur celles qui te plaisent.
+4. **Mode validation** — `mode validation` : réel, rien ne part sans ton ✅.
+5. **Mode auto** — `mode auto` : il envoie seul les lettres notées ≥ 8/10 par le Juge.
 
-`python -m unittest discover tests -v` fait tourner tout le circuit en simulation : recherche → tri → lettres →
-validation → envoi → réponse « entretien » → confirmation du rendez-vous → relance → refus silencieux.
+Tes remarques (« trop long », « parle de mon Erasmus ») vont dans `profil/style.md` et s'appliquent à toutes
+les lettres suivantes ; les lettres que tu valides servent de modèle de ton.
+
+## Budget
+
+`BUDGET_JOUR_EUR` (2 € par défaut). Les tâches de fond (recherche, prospection, enquête) s'arrêtent à 70 %
+pour garder de quoi écrire les lettres et te répondre. Au-delà de 100 %, seules les commandes sans IA marchent
+jusqu'au lendemain. `stats` affiche la dépense.
+
+## Tester le code
+
+`python -m unittest discover tests -v` fait tourner tout le circuit en simulation (sans IA ni email réels).

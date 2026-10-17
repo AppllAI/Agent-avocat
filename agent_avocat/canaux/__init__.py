@@ -6,7 +6,7 @@ from .. import config
 
 
 def choisir(nom: str | None = None):
-    nom = nom or config.env("CANAL", "console")
+    nom = nom or config.env("CANAL", "telegram")
     if nom == "whatsapp":
         from .whatsapp import WhatsApp
         return WhatsApp()

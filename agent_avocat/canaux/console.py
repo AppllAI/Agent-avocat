@@ -8,8 +8,9 @@ from pathlib import Path
 class Console:
     nom = "console"
 
-    def envoyer(self, texte):
-        print(f"\n🤖 {texte}\n", flush=True)
+    def envoyer(self, texte, boutons=None):
+        from ..messagerie import texte_boutons
+        print(f"\n🤖 {texte}{texte_boutons(boutons)}\n", flush=True)
 
     def envoyer_fichier(self, chemin: Path, legende=""):
         print(f"🤖 📎 {legende} → {chemin}", flush=True)
