@@ -65,12 +65,13 @@ def _nom(base, ext):
 
 
 def connexion_smtp():
-    """SMTP chiffré : port 465 (SSL direct) ou 587 (STARTTLS), selon le fournisseur."""
+    """SMTP chiffré : port 465 (SSL direct) ou 587 (STARTTLS), selon le fournisseur.
+    local_hostname fixé : sinon Python envoie le nom du PC, qui plante s'il contient un accent."""
     hote, port = config.env("SMTP_HOTE", "smtp.gmail.com"), config.env_int("SMTP_PORT", 465)
     if port == 465:
-        s = smtplib.SMTP_SSL(hote, port, timeout=30)
+        s = smtplib.SMTP_SSL(hote, port, timeout=30, local_hostname="localhost")
     else:
-        s = smtplib.SMTP(hote, port, timeout=30)
+        s = smtplib.SMTP(hote, port, timeout=30, local_hostname="localhost")
         s.starttls()
     s.login(config.env("EMAIL_ADRESSE"), config.env("EMAIL_MOT_DE_PASSE"))
     return s

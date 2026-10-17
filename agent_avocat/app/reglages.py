@@ -159,7 +159,9 @@ def tester_email(email: str, mot_de_passe: str, hote_smtp: str, port: int, hote_
     if not hote_smtp or not hote_imap:
         return "Je ne connais pas ce fournisseur : utilise une adresse Gmail (recommandé)."
     try:
-        s = smtplib.SMTP_SSL(hote_smtp, port, timeout=20) if port == 465 else smtplib.SMTP(hote_smtp, port, timeout=20)
+        # local_hostname fixé : sinon Python envoie le nom du PC (plante s'il contient un accent)
+        s = (smtplib.SMTP_SSL(hote_smtp, port, timeout=20, local_hostname="localhost") if port == 465
+             else smtplib.SMTP(hote_smtp, port, timeout=20, local_hostname="localhost"))
         if port != 465:
             s.starttls()
         s.login(email, mot_de_passe)
@@ -167,13 +169,13 @@ def tester_email(email: str, mot_de_passe: str, hote_smtp: str, port: int, hote_
         m = imaplib.IMAP4_SSL(hote_imap, timeout=20)
         m.login(email, mot_de_passe)
         m.logout()
-    except UnicodeEncodeError:
-        return "Le mot de passe contient un caractère spécial invisible : retape-le à la main (lettres a-z)."
+    except UnicodeEncodeError as e:
+        return f"Caractère spécial refusé par le serveur email ({str(e)[:100]}). Envoie-moi ce message."
     except (smtplib.SMTPAuthenticationError, imaplib.IMAP4.error):
         return ("Adresse ou mot de passe refusé. Pour Gmail, il faut un « mot de passe d'application » "
                 "(16 lettres), pas ton mot de passe habituel.")
     except Exception as e:
-        return f"Connexion impossible au serveur email ({type(e).__name__}). Vérifie ta connexion internet."
+        return f"Connexion impossible au serveur email ({type(e).__name__} : {str(e)[:120]})."
     return None
 
 
