@@ -46,8 +46,32 @@ fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **C
  Rapporteur (stats, bilan du soir) · Essayeur (tests sans envoi)
 ```
 
-**23 agents**, dont 9 sans IA. L'IA rapide (Haiku) trie, note, juge, comprend tes messages ;
-l'IA qualité (Sonnet) écrit ce que les recruteurs liront et prépare tes entretiens.
+**23 agents**, dont 9 sans IA. L'IA rapide (Haiku) trie, note et comprend tes messages ;
+l'IA qualité (Sonnet) écrit et juge ce que les recruteurs liront, et prépare tes entretiens.
+
+## Zéro invention : 4 filets de sécurité
+
+1. **Rédacteur** (Sonnet, avec réflexion) : consigne stricte — uniquement les faits du profil, accords au genre
+   indiqué (jamais deviné d'après le prénom), prudence sur les faits trouvés sur le web.
+2. **Juge** (Sonnet, sans réflexion) : liste chaque fait sur la personne avec la **citation exacte** du profil qui le prouve.
+3. **Le code vérifie les citations** : une « preuve » introuvable dans le profil = invention → réécriture.
+   (Une IA ne peut pas valider une invention en inventant aussi la preuve.)
+4. **Détecteur de chiffres** (sans IA) : chaque durée, chiffre et niveau de langue (B1/B2…) doit exister dans le profil
+   ou l'offre — vérifié à l'écriture ET juste avant l'envoi.
+
+Testé contre la vraie API : une lettre piégée avec 4 inventions (« pendant un an » au lieu de 3 mois, une plaidoirie
+inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrapées. Une lettre exacte → aucune fausse alerte.
+
+## Coûts mesurés (API réelle, octobre 2026)
+
+| Étape | Coût |
+|---|---|
+| Lecture du CV (une fois) | ~0,02 € |
+| Note de 8 offres | ~0,002 € |
+| Lettre + Juge | ~0,04 € (0,07 € si une réécriture) |
+| Offre écartée par tes règles | 0 € |
+| Recherche web | ~0,10 € (2-3 fois/jour) |
+| LexGO / Indeed | 0 € |
 
 ## Ce qui se passe quand tu lances l'application
 

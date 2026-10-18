@@ -19,7 +19,9 @@ SCHEMA = {
 
 
 def enqueter(score_min: int = 8):
-    for o in db.q("SELECT * FROM offres WHERE statut='qualifiee' AND infos_cabinet IS NULL"):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def une(o):
         infos = {"faits": [], "destinataire": None}
         if o["entreprise"] and ((o["score"] or 0) >= score_min or not o["email_contact"]):
             try:
@@ -27,7 +29,8 @@ def enqueter(score_min: int = 8):
                                  json.dumps({"employeur": o["entreprise"], "ville": o["ville"],
                                              "poste": o["titre"], "url_offre": o["url"],
                                              "email_connu": o["email_contact"]}, ensure_ascii=False),
-                                 SCHEMA, web=True, recherches_max=2, max_tokens=1200, priorite="fond")
+                                 SCHEMA, web=True, recherches_max=2 if (o["score"] or 0) >= score_min else 1,
+                                 max_tokens=1200, priorite="fond")
                 infos = {"faits": r.get("faits", []), "destinataire": r.get("destinataire")}
                 email = outils.emails_dans(r.get("email_recrutement") or "")
                 if email and not o["email_contact"]:
@@ -37,3 +40,7 @@ def enqueter(score_min: int = 8):
             except Exception as e:
                 db.journal("enqueteur", f"échec : {e}", o["id"])
         db.maj(o["id"], infos_cabinet=json.dumps(infos, ensure_ascii=False))
+
+    offres = db.q("SELECT * FROM offres WHERE statut='qualifiee' AND infos_cabinet IS NULL")
+    with ThreadPoolExecutor(3) as ex:      # 3 enquêtes en parallèle
+        list(ex.map(une, offres))

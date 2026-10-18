@@ -26,7 +26,10 @@ def evaluer(taille_lot: int = 8):
         return 0          # sans ton profil, toute note serait fausse : on attend la lecture du CV
     dom, regles = config.domaine_actif(), config.regles_envoi()
     offres = [dict(o) for o in db.q("SELECT * FROM offres WHERE statut='enrichie' ORDER BY id")]
-    systeme = llm.prompt("evaluateur") + "\n\n## Objectif\n" + json.dumps(dom, ensure_ascii=False) + \
+    utiles = ("description", "postes_vises", "matieres_uniquement", "matieres_exclues", "villes", "teletravail_ok",
+              "langues", "contrats", "exclure_entreprises", "disponibilite")
+    systeme = llm.prompt("evaluateur") + "\n\n## Objectif\n" + \
+        json.dumps({k: dom.get(k) for k in utiles if dom.get(k) not in (None, "", [])}, ensure_ascii=False) + \
         "\n\n## Profil\n" + config.profil_texte()
     retenues = 0
     for i in range(0, len(offres), taille_lot):

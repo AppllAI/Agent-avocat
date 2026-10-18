@@ -24,6 +24,8 @@ SCHEMA_COACH = {
             "contrats": LISTE, "exclure_entreprises": LISTE, "mots_cles_recherche": LISTE,
             "disponibilite": {"type": "string"}}},
         "termine": {"type": "boolean"},
+        "accords": {"type": ["string", "null"], "enum": ["masculin", "féminin", None],
+                    "description": "Si la personne vient de dire si ses lettres sont au masculin ou au féminin"},
     },
     "required": ["reponse", "objectif_maj", "termine"],
 }
@@ -70,6 +72,12 @@ def parler(texte: str):
                          SCHEMA_COACH, max_tokens=900)
     except llm.BudgetDepasse as e:
         return messagerie.dire(f"⏸️ {e}. On reprend demain !")
+    accords = r.get("accords")
+    if accords in ("masculin", "féminin") and "Accords" not in config.profil_texte():
+        f = config.PROFIL_DIR / "profil.md"
+        if f.exists():
+            with open(f, "a", encoding="utf-8") as fh:
+                fh.write(f"\n- Accords : {accords}\n")
     permis = SCHEMA_COACH["properties"]["objectif_maj"]["properties"]
     maj = {k: v for k, v in (r.get("objectif_maj") or {}).items() if k in permis and v not in (None, "", [])}
     if maj:

@@ -4,7 +4,8 @@
      – le profil (seule source de vérité),
      – les liens « pourquoi toi » trouvés par l'Évaluateur, les faits trouvés par l'Enquêteur,
      – tes notes de style (« plus court », « moins formel »…) et 2 lettres que tu as validées (il apprend ton goût).
-  Juge (modèle rapide, regard neuf) : note /10 selon une grille d'associé exigeant, bloque toute invention.
+  Juge (Sonnet sans réflexion, regard neuf) : liste chaque fait de la lettre avec sa preuve citée du profil ;
+     le CODE vérifie chaque citation et chaque chiffre/durée/niveau de langue → zéro invention qui passe.
   Jusqu'à 3 versions ; on garde la meilleure. Sous la note minimale → elle t'est montrée avec un ⚠️."""
 from __future__ import annotations
 
@@ -22,9 +23,16 @@ SCHEMA_LETTRE = {
 }
 SCHEMA_JUGE = {
     "type": "object",
-    "properties": {"note": {"type": "integer", "minimum": 1, "maximum": 10}, "invention": {"type": "boolean"},
-                   "corrections": {"type": "array", "items": {"type": "string"}}},
-    "required": ["note", "invention", "corrections"],
+    "properties": {
+        "affirmations": {"type": "array", "description": "Chaque fait sur la personne affirmé dans la lettre ou l'email",
+                         "items": {"type": "object", "properties": {
+                             "extrait_lettre": {"type": "string"},
+                             "preuve_profil": {"type": ["string", "null"],
+                                               "description": "Citation EXACTE, copiée du profil, qui prouve ce fait. null si absente."}},
+                             "required": ["extrait_lettre", "preuve_profil"]}},
+        "note": {"type": "integer", "minimum": 1, "maximum": 10}, "invention": {"type": "boolean"},
+        "corrections": {"type": "array", "items": {"type": "string"}}},
+    "required": ["affirmations", "note", "invention", "corrections"],
 }
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
         "novembre", "décembre"]
@@ -46,13 +54,15 @@ def lettres_aimees(n: int = 2) -> list[str]:
 
 
 def ecrire_pdf(texte: str, chemin):
+    """Lettre en PDF propre : A4, marges 25 mm, paragraphes justifiés et aérés, police lisible."""
     try:
         from fpdf import FPDF
     except ImportError:  # sans fpdf2 on garde un .txt lisible
         chemin.with_suffix(".txt").write_text(texte, encoding="utf-8")
         return chemin.with_suffix(".txt")
-    pdf = FPDF()
-    pdf.set_margins(22, 20, 22)
+    pdf = FPDF(format="A4")
+    pdf.set_margins(25, 22, 25)
+    pdf.set_auto_page_break(True, margin=20)
     pdf.add_page()
     police = "Helvetica"
     for f in ("C:/Windows/Fonts/arial.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -63,10 +73,25 @@ def ecrire_pdf(texte: str, chemin):
             break
         except Exception:
             continue
-    pdf.set_font(police, size=11)
+    pdf.set_font(police, size=10.5)
     if police == "Helvetica":
         texte = texte.encode("latin-1", "replace").decode("latin-1")
-    pdf.multi_cell(0, 6, texte)
+    blocs = [b.strip("\n") for b in texte.replace("\r", "").split("\n\n")]
+    for b in blocs:
+        if not b.strip():
+            continue
+        lignes = b.split("\n")
+        court = all(len(l) < 60 for l in lignes)          # coordonnées, date, signature : alignés à gauche
+        puces = any(l.lstrip().startswith(("- ", "• ", "– ")) for l in lignes)
+        if puces:
+            for l in lignes:
+                pdf.multi_cell(0, 5.4, l.strip(), align="J", new_x="LMARGIN", new_y="NEXT")
+        elif court:
+            for l in lignes:
+                pdf.cell(0, 5.2, l.strip(), new_x="LMARGIN", new_y="NEXT")
+        else:
+            pdf.multi_cell(0, 5.4, " ".join(l.strip() for l in lignes), align="J", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(3.2)
     pdf.output(str(chemin))
     return chemin
 
@@ -86,17 +111,25 @@ def ecrire_une(o) -> dict:
                          SCHEMA_LETTRE, max_tokens=8000)
         if len((r.get("lettre") or "").split()) < 120 or not r.get("email") or not r.get("objet"):
             raise ValueError("lettre vide ou incomplète renvoyée par l'IA")
-        j = llm.demander("juge", "rapide", systeme_j,
+        # Juge = Sonnet sans réflexion : testé contre la vraie API, il attrape TOUTES les inventions glissées
+        # (Haiku en ratait) et ne sous-note pas les bonnes lettres → moins de réécritures inutiles.
+        j = llm.demander("juge", "qualite", systeme_j,
                          json.dumps({"offre": demande["offre"], "candidature": r}, ensure_ascii=False),
-                         SCHEMA_JUGE, max_tokens=700)
+                         SCHEMA_JUGE, max_tokens=3000, reflexion=False)
         note = 1 if j.get("invention") else int(j.get("note") or 1)
-        from .controle import chiffres_inventes
+        from .controle import chiffres_inventes, preuve_valide
+        # 1) Chaque fait doit être prouvé par une citation du profil, vérifiée PAR LE CODE (pas par l'IA)
+        sans_preuve = [a.get("extrait_lettre", "") for a in j.get("affirmations") or []
+                       if isinstance(a, dict) and not preuve_valide(a.get("preuve_profil"), profil)]
+        # 2) Chaque chiffre / durée doit exister dans le profil ou l'offre
         suspects = chiffres_inventes(f"{r.get('lettre', '')}\n{r.get('email', '')}",
                                      f"{profil}\n{json.dumps(demande['offre'], ensure_ascii=False)}\n{aujourdhui}")
-        if suspects:
+        alertes = [f"Retire ou reformule « {x[:120]} » : rien dans le profil ne le prouve." for x in sans_preuve if x] + \
+                  [f"Retire ou corrige « {s} » : ce chiffre/cette durée n'est ni dans le profil ni dans l'offre."
+                   for s in suspects]
+        if alertes:
             note = min(note, 4)
-            j["corrections"] = [f"Retire ou corrige « {s} » : ce chiffre/cette durée n'est ni dans le profil ni dans "
-                                "l'offre." for s in suspects[:3]] + list(j.get("corrections") or [])[:2]
+            j["corrections"] = alertes[:4] + list(j.get("corrections") or [])[:1]
         if meilleure is None or note > meilleure["note"]:
             meilleure = {**r, "note": note, "corrections": j.get("corrections") or []}
         if note >= regles["note_lettre_minimum"]:

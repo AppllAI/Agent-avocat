@@ -200,6 +200,19 @@ class ChiffresInventes(unittest.TestCase):
         self.assertEqual(controle.chiffres_inventes("Pendant un an, j'ai étudié la copropriété.", profil), ["1 an"])
         self.assertEqual(controle.chiffres_inventes("Mon stage de trois mois, noté 16/20, en 2025.", profil), [])
         self.assertEqual(controle.chiffres_inventes("Une équipe de 40 avocats.", profil), ["40"])
+        self.assertEqual(controle.chiffres_inventes("Néerlandais B2.", profil + " Néerlandais : B1"), ["niveau B2"])
+        self.assertEqual(controle.chiffres_inventes("Néerlandais B1.", profil + " Néerlandais : B1"), [])
+
+    def test_dates_et_telephone_ignores(self):
+        profil = "Tél. 0470 12 34 56 · stage 2025 (3 mois)"
+        self.assertEqual(controle.chiffres_inventes(
+            "Bruxelles, le 24 novembre 2026. Joignable au 0470/12.34.56 ou +32 470 12 34 56.", profil), [])
+
+    def test_preuves(self):
+        profil = "- Stagiaire, étude notariale Lambert & Fils, Ixelles\n- Préparation de compromis de vente"
+        self.assertTrue(controle.preuve_valide("Préparation de compromis de vente", profil))
+        self.assertFalse(controle.preuve_valide("plaidé devant la justice de paix", profil))
+        self.assertFalse(controle.preuve_valide(None, profil))
 
 
 class LexGO(unittest.TestCase):

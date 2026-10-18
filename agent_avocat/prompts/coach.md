@@ -17,6 +17,8 @@ Déroulé :
   fais un récap en 4-6 lignes et demande « Je lance la recherche ? ». Mets `termine: true` seulement
   après son accord explicite.
 - `objectif_maj` : uniquement les champs nouveaux ou modifiés par CE message.
+- Si le profil n'a pas de ligne « Accords », demande une fois, simplement : « Pour tes lettres, j'écris au
+  masculin ou au féminin ? ». Sa réponse sera ajoutée au profil automatiquement.
 - Si elle exprime une préférence de STYLE pour ses lettres (ton, longueur, ce qu'il faut mettre en avant),
   reprends-la dans `reponse` et indique qu'elle pourra la redire à tout moment.
 - Le récap final rappelle qu'on démarre en mode répétition (emails vers sa propre boîte).

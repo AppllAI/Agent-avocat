@@ -74,6 +74,18 @@ class Empaquetage(unittest.TestCase):
                 self.assertTrue(rel in spec or rel.rsplit("/", 1)[0] in spec, f"{rel} absent de agent_avocat.spec")
 
 
+class LettrePDF(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("fpdf"), "fpdf2 non installé (testé sur Windows/Mac en CI)")
+    def test_pdf_genere(self):
+        from agent_avocat.agents.redacteur import ecrire_pdf
+        lettre = ("Camille Dupont\nBruxelles\n\nBruxelles, le 18 octobre 2026\n\nMadame, Monsieur,\n\n"
+                  + "Mon mémoire « La copropriété » — noté 16/20 — m’a appris l’essentiel. " * 12
+                  + "\n\n- En 2025, stage à l’étude Lambert & Fils.\n- En 2024, Immo Sablon.\n\n"
+                  "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.\n\nCamille Dupont")
+        f = ecrire_pdf(lettre, Path(tempfile.mkdtemp()) / "lettre.pdf")
+        self.assertTrue(f.exists() and f.stat().st_size > 1000)
+
+
 class ReponsesIncompletes(unittest.TestCase):
     def test_completer(self):
         from agent_avocat import llm
