@@ -47,7 +47,11 @@ def analyser(o: dict) -> dict:
                      evaluateur.SCHEMA, max_tokens=600)["notes"][0]
     rapport["evaluation"] = n
     o["score"], o["pourquoi"] = n["score"], json.dumps(n.get("pourquoi") or [], ensure_ascii=False)
-    if o.get("entreprise") and o["source"] != "spontanee" and "fictif" not in o["entreprise"]:
+    if rapport["garde"] or n.get("regle_violee") or (n.get("score") or 0) < regles["score_minimum"]:
+        rapport["candidature"] = None       # offre écartée : on n'écrit pas (et on ne paie pas) de lettre
+        rapport["offre"] = o
+        return rapport
+    if o.get("entreprise") and o["source"] != "spontanee" and not o.get("fictif"):
         try:
             e = llm.demander("enqueteur", "rapide", llm.prompt("enqueteur"),
                              json.dumps({"employeur": o["entreprise"], "ville": o.get("ville"), "poste": o.get("titre"),
@@ -68,13 +72,15 @@ def analyser(o: dict) -> dict:
 def texte_rapport(r: dict) -> str:
     o, n, c = r["offre"], r["evaluation"], r["candidature"]
     garde_txt = f"🚫 Tes règles l'excluent : {r['garde']}" if r["garde"] else "✅ Respecte tes règles"
-    regle = " (règle stricte violée)" if n["regle_violee"] else ""
-    return (f"🧪 *Essai : {o.get('titre')}* — {o.get('entreprise') or '?'}\n{garde_txt}\n"
-            f"Adéquation : {n['score']}/10{regle} · {n['raison']}\n"
-            + "".join(f"• {p}\n" for p in n.get("pourquoi") or [])
-            + f"Lettre : {c['note']}/10 selon le Juge"
-            + (f"\nRemarques : {'; '.join(c['corrections'][:3])}" if c["corrections"] else "")
-            + f"\nEnvoi : {'📧 ' + o['email_contact'] if o.get('email_contact') else '🌐 formulaire sur leur site'}\n\n"
+    regle = " (règle stricte violée)" if n.get("regle_violee") else ""
+    tete = (f"🧪 *Essai : {o.get('titre')}* — {o.get('entreprise') or '?'}\n{garde_txt}\n"
+            f"Adéquation : {n.get('score')}/10{regle} · {n.get('raison') or ''}\n"
+            + "".join(f"• {p}\n" for p in n.get("pourquoi") or []))
+    if c is None:
+        return tete + "➡️ Offre écartée : je n'écris pas de lettre (aucun coût)."
+    envoi = f"📧 {o['email_contact']}" if o.get("email_contact") else "🌐 formulaire sur leur site"
+    remarques = f"\nRemarques : {'; '.join(c['corrections'][:3])}" if c["corrections"] else ""
+    return (tete + f"Lettre : {c['note']}/10 selon le Juge{remarques}\nEnvoi : {envoi}\n\n"
             f"✉️ *{c['objet']}*\n{c['email']}\n\n— Lettre —\n{c['lettre']}")
 
 
@@ -88,6 +94,8 @@ def essayer(url: str):
     dossier.mkdir(parents=True, exist_ok=True)
     o, c = r["offre"], r["candidature"]
     boutons = None
+    if c is None:
+        return messagerie.dire(texte_rapport(r)[:3900])
     if not r["garde"] and not r["evaluation"]["regle_violee"]:
         with db.tx() as cx:
             cur = cx.execute(
@@ -123,7 +131,8 @@ def banc_essai() -> Path:
         except Exception as e:
             lignes.append(f"\n## {i}. {o['titre']} — ÉCHEC : {e}\n")
             continue
-        notes.append(r["candidature"]["note"])
+        if r["candidature"]:
+            notes.append(r["candidature"]["note"])
         lignes.append(f"\n---\n\n## {i}. {o['titre']} — {o['entreprise']}\n\n" + texte_rapport(r).replace("*", "**"))
     cout = llm.depense_du_jour() - depart
     lignes.insert(2, f"**Note moyenne du Juge : {sum(notes) / max(len(notes), 1):.1f}/10** · coût : {cout:.2f} €\n")

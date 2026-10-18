@@ -155,11 +155,30 @@ def _une_requete(requete: str, dom: dict, connues: list) -> list[dict]:
                           "matieres_exclues": dom.get("matieres_exclues"), "langues": dom.get("langues"),
                           "deja_connues": connues, "nombre_max": 10}, ensure_ascii=False)
     r = llm.demander("eclaireur", "rapide", llm.prompt("eclaireur_web"), contenu, SCHEMA_OFFRES,
-                     web=True, recherches_max=4, max_tokens=4000, priorite="fond")
-    return [{**o, "source": "web"} for o in r.get("offres", [])]
+                     web=True, recherches_max=3, max_tokens=4000, priorite="fond")
+    offres = [{**o, "source": "web"} for o in r.get("offres", [])]
+    bonnes = [o for o in offres if annonce_precise(o)]
+    if len(bonnes) < len(offres):
+        db.journal("eclaireur", f"web : {len(offres) - len(bonnes)} résultat(s) ignoré(s) (pas une annonce précise)")
+    return bonnes
 
 
-def recherche_web(n_requetes: int = 2) -> int:
+_FIN_DE_LISTE = {"jobs", "job", "emploi", "emplois", "vacatures", "offres", "offres-d-emploi", "carrieres",
+                 "careers", "recrutement", ""}
+_MORCEAUX_DE_LISTE = ("/search", "/recherche", "/functions/", "?q=", "&q=", "?keywords=", "?query=")
+
+
+def annonce_precise(o: dict) -> bool:
+    """Une vraie annonce : un employeur nommé et un lien vers L'annonce, pas vers une page de résultats."""
+    from urllib.parse import urlparse
+    url = (o.get("url") or "").strip().lower()
+    if not o.get("entreprise") or not url.startswith("http") or any(m in url for m in _MORCEAUX_DE_LISTE):
+        return False
+    dernier = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+    return dernier not in _FIN_DE_LISTE
+
+
+def recherche_web(n_requetes: int = 1) -> int:
     dom = config.domaine_actif()
     requetes = dom.get("mots_cles_recherche") or []
     if not requetes:

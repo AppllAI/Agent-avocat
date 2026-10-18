@@ -15,3 +15,7 @@ Règles :
 - `email_contact` uniquement s'il est écrit dans l'annonce ou sur la page recrutement officielle.
 - Ignore les offres déjà connues (liste fournie) et celles hors Belgique.
 - `description` : résumé fidèle (missions, profil demandé, langues, contrat) en 3 à 6 phrases.
+- Chaque offre DOIT avoir un employeur nommé et l'URL de L'ANNONCE elle-même (pas une page de résultats,
+  pas une liste d'offres, pas la page d'accueil d'un site). Sinon, ne la rends pas.
+- Respecte les matières voulues / exclues : ne rends pas une offre hors matière.
+- Mieux vaut 2 vraies offres que 10 approximatives. Aucune offre trouvée → liste vide, c'est normal.

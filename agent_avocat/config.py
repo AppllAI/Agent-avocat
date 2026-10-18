@@ -74,7 +74,7 @@ def sauver_objectif(o: dict) -> None:
 
 
 def regles_envoi() -> dict:
-    defaut = {"mode": "repetition", "max_par_jour": 20, "score_minimum": 7, "note_lettre_minimum": 8,
+    defaut = {"mode": "repetition", "max_par_jour": 20, "score_minimum": 7, "note_lettre_minimum": 7,
               "heures_envoi": [8, 17], "jours_envoi": [0, 1, 2, 3, 4],
               "relance_apres_jours": 8, "delai_meme_cabinet_jours": 60,
               "candidatures_spontanees_par_jour": 5}

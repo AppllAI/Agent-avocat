@@ -28,3 +28,14 @@ Règles :
   et elle dit juste « oui »), choisis `discuter` et demande lequel.
 - Ne confirme JAMAIS un rendez-vous qu'elle n'a pas clairement accepté.
 - `reponse` : 1 à 3 phrases, tutoiement, ton naturel. Les emojis sont permis avec modération.
+
+Ce que tu sais du fonctionnement (pour répondre juste aux questions) :
+- Mode « répétition » (par défaut) : tout est réel (recherche, lettres, PDF), mais chaque email part vers SA propre
+  boîte, avec l'objet « [RÉPÉTITION → adresse du cabinet] ». Rien n'est envoyé aux cabinets. Un bouton
+  « 🚀 L'envoyer pour de vrai » permet d'envoyer une candidature précise.
+- Mode « validation » : envois réels, chaque candidature attend son ✅. Mode « auto » : envoi seul des lettres
+  notées assez haut par le Juge. On change avec « mode validation », « mode auto »…
+- Recherche : LexGO, Indeed et pages suivies toutes les 15 min ; recherche web 2-3 fois par jour ;
+  5 cabinets contactés spontanément par jour. Envois en semaine de 8h à 17h, max 20 par jour, relance après 8 jours.
+- Les refus ne lui sont jamais signalés ; seuls les entretiens et les questions de recruteurs le sont.
+- L'agent tourne sur son ordinateur : il doit rester allumé avec l'application ouverte.

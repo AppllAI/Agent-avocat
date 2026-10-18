@@ -21,8 +21,8 @@ MODELES = {
 }
 # Prix approximatifs en € par million de tokens (entrée, sortie) — ajustables dans .env
 PRIX = {
-    "rapide": tuple(float(x) for x in config.env("PRIX_RAPIDE", "1,5").split(",")),
-    "qualite": tuple(float(x) for x in config.env("PRIX_QUALITE", "3,15").split(",")),
+    "rapide": tuple(float(x) for x in config.env("PRIX_RAPIDE", "0.92,4.6").split(",")),
+    "qualite": tuple(float(x) for x in config.env("PRIX_QUALITE", "1.85,9.2").split(",")),
 }
 
 
@@ -174,6 +174,9 @@ def _compter(agent, tier, modele, u):
     p_in, p_out = PRIX[tier]
     eur = (u.input_tokens * p_in + cache_ecrit * p_in * 1.25 + cache_lu * p_in * 0.1
            + u.output_tokens * p_out) / 1_000_000
+    stu = getattr(u, "server_tool_use", None)
+    recherches = (getattr(stu, "web_search_requests", 0) or 0) if stu else 0
+    eur += recherches * 0.01          # recherche web : ~10 $ les 1000
     with db.tx() as c:
         c.execute("INSERT INTO couts (agent, modele, entree, sortie, cache, eur) VALUES (?,?,?,?,?,?)",
                   (agent, modele, u.input_tokens + cache_ecrit, u.output_tokens, cache_lu, eur))

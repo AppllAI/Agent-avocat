@@ -79,7 +79,7 @@ def ecrire_une(o) -> dict:
     demande = {"offre": _offre(o), "date_du_jour": aujourdhui, "notes_style": config.style_texte() or None,
                "lettres_aimees": lettres_aimees()}
     meilleure = None
-    for _ in range(3):
+    for _ in range(2):          # 1 réécriture max : au-delà, la qualité ne monte plus et le coût double
         r = llm.demander("redacteur", "qualite", systeme_r, json.dumps(demande, ensure_ascii=False),
                          SCHEMA_LETTRE, max_tokens=8000)
         if len((r.get("lettre") or "").split()) < 120 or not r.get("email") or not r.get("objet"):

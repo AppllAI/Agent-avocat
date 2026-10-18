@@ -31,7 +31,7 @@ envoi:
   mode: repetition
   max_par_jour: 20
   score_minimum: 7               # adéquation offre / toi, sur 10
-  note_lettre_minimum: 8         # qualité de la lettre selon le Juge, sur 10
+  note_lettre_minimum: 7         # qualité de la lettre selon le Juge, sur 10 (7 = envoyable, 9 = excellente)
   heures_envoi: [8, 17]          # les candidatures du matin ont plus de réponses (heure belge)
   jours_envoi: [0, 1, 2, 3, 4]   # lundi → vendredi
   relance_apres_jours: 8

@@ -218,6 +218,16 @@ class LexGO(unittest.TestCase):
                          ("Avocat stagiaire", "Bruxelles", "2026-10-15", "permanent"))
 
 
+class AnnoncePrecise(unittest.TestCase):
+    def test_pages_de_liste_rejetees(self):
+        a = sources.annonce_precise
+        self.assertFalse(a({"entreprise": "X", "url": "https://www.lexgo.be/en/functions/1-legal-jobs/jobs"}))
+        self.assertFalse(a({"entreprise": None, "url": "https://www.jobat.be/fr/emplois/juriste-123"}))
+        self.assertFalse(a({"entreprise": "Cab", "url": "https://www.stepstone.be/emplois/"}))
+        self.assertTrue(a({"entreprise": "Cab", "url": "https://www.jobat.be/fr/emplois/juriste-immobilier-123"}))
+        self.assertTrue(a({"entreprise": "Cab", "url": "https://www.lexgo.be/fr/emploi/12345-avocat-stagiaire"}))
+
+
 class Garde(unittest.TestCase):
     def test_synonymes_et_langues(self):
         dom = {"matieres_exclues": ["droit pénal"], "langues": ["français"], "matieres_uniquement": []}

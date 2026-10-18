@@ -5,4 +5,5 @@ Rédige une fiche profil factuelle en Markdown qui servira de SEULE source de v�
 - Sections : Identité (nom, téléphone, email, ville), Formation (diplômes, établissements, années, mentions),
   Expériences (poste, structure, dates, missions concrètes), Compétences juridiques, Langues (niveau tel qu'indiqué),
   Autres (engagements, distinctions, permis…).
-- Liste `manquants` : informations utiles absentes du CV (ex. téléphone, niveau de néerlandais, disponibilité).
+- Liste `manquants` : AU PLUS 3 informations vraiment utiles pour postuler et absentes du CV
+  (ex. disponibilité / date de début, téléphone, type de poste visé). Formulation courte (3-6 mots chacune).
