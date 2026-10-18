@@ -63,5 +63,25 @@ class Reglages(unittest.TestCase):
         self.assertTrue(hasattr(f, "Application"))
 
 
+class Empaquetage(unittest.TestCase):
+    def test_fichiers_de_donnees_dans_l_app(self):
+        """Tout fichier non-Python du paquet doit être embarqué dans l'application (.exe / .app)."""
+        racine = Path(__file__).resolve().parent.parent
+        spec = (racine / "agent_avocat.spec").read_text(encoding="utf-8")
+        for f in (racine / "agent_avocat").rglob("*"):
+            if f.is_file() and f.suffix not in (".py", ".pyc") and "__pycache__" not in f.parts:
+                rel = f.relative_to(racine).as_posix()
+                self.assertTrue(rel in spec or rel.rsplit("/", 1)[0] in spec, f"{rel} absent de agent_avocat.spec")
+
+
+class ReponsesIncompletes(unittest.TestCase):
+    def test_completer(self):
+        from agent_avocat import llm
+        schema = {"required": ["note", "invention", "corrections"],
+                  "properties": {"note": {"type": "integer"}, "invention": {"type": "boolean"},
+                                 "corrections": {"type": "array"}}}
+        self.assertEqual(llm.completer({"note": 9}, schema), {"note": 9, "invention": False, "corrections": []})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

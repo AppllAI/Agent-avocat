@@ -14,6 +14,7 @@ a = Analysis(
     ["lanceur.py"],
     datas=[("agent_avocat/prompts", "agent_avocat/prompts"),
            ("agent_avocat/objectif_exemple.yaml", "agent_avocat"),
+           ("agent_avocat/banc_essai.json", "agent_avocat"),
            ("assets/icone_256.png", "assets")] + collect_data_files("tzdata"),
     binaries=[(str(pont), "pont")] if pont.exists() else [],
     hiddenimports=collect_submodules("agent_avocat") + collect_submodules("anthropic") + ["qrcode", "pypdf", "fpdf", "tzdata"],

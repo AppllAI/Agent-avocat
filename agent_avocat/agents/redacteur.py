@@ -85,9 +85,9 @@ def ecrire_une(o) -> dict:
         j = llm.demander("juge", "rapide", systeme_j,
                          json.dumps({"offre": demande["offre"], "candidature": r}, ensure_ascii=False),
                          SCHEMA_JUGE, max_tokens=700)
-        note = 1 if j["invention"] else j["note"]
+        note = 1 if j.get("invention") else int(j.get("note") or 1)
         if meilleure is None or note > meilleure["note"]:
-            meilleure = {**r, "note": note, "corrections": j["corrections"]}
+            meilleure = {**r, "note": note, "corrections": j.get("corrections") or []}
         if note >= regles["note_lettre_minimum"]:
             break
         demande["corrections_a_appliquer"] = j["corrections"]
@@ -111,7 +111,13 @@ def rediger(limite: int = 8):
         except llm.BudgetDepasse:
             return
         except Exception as e:
-            db.journal("redacteur", f"échec : {e}", o["id"])
+            essais = (o["tentatives"] or 0) + 1
+            db.maj(o["id"], tentatives=essais)
+            db.journal("redacteur", f"échec {essais}/3 : {type(e).__name__}: {e}", o["id"])
+            if essais >= 3:   # on arrête de payer pour une offre qui plante
+                db.changer_statut(o["id"], "erreur", "redacteur", f"lettre impossible : {e}")
+                messagerie.dire(f"⚠️ Je n'arrive pas à écrire la lettre pour *{o['entreprise'] or o['titre']}* "
+                                f"({type(e).__name__}). Je l'ai mise de côté.")
             continue
         ecrire_pdf(v["lettre"], dossier / f"lettre_{o['id']}.pdf")
         bonne = v["note"] >= regles["note_lettre_minimum"]

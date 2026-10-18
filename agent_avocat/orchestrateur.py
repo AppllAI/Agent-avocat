@@ -53,8 +53,16 @@ def _reessayer_cv():
 
 
 def en_fond(f, *a):
-    """Travail long hors du fil des messages : tu peux continuer à écrire pendant ce temps."""
-    threading.Thread(target=_proteger, args=(getattr(f, "__name__", "tâche"), f, *a), daemon=True).start()
+    """Travail long hors du fil des messages : tu peux continuer à écrire pendant ce temps.
+    En cas d'échec, tu reçois un message au lieu d'un silence."""
+    def tache():
+        try:
+            f(*a)
+        except Exception as e:
+            db.journal("orchestre", f"{getattr(f, '__name__', 'tâche')} a échoué : {type(e).__name__}: {e}")
+            messagerie.dire(f"⚠️ Oups, ça a planté de mon côté ({type(e).__name__}). "
+                            "Envoie une capture de « Ce que font les agents » au développeur.")
+    threading.Thread(target=tache, daemon=True).start()
 
 
 # ---------- étapes ----------

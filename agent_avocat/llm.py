@@ -87,20 +87,48 @@ def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
 
     messages = [{"role": "user", "content": contenu}]
     modele = MODELES[tier]()
+    deja_relance = False
     for tour in range(6):
         if modele in _SANS_FORCAGE:
             choix = {"type": "auto"}
         r = _appel(modele, systeme + CONSIGNE_OUTIL, messages, tools, choix, max_tokens)
         _compter(agent, tier, modele, r.usage)
-        for b in r.content:
-            if b.type == "tool_use" and b.name == "repondre":
-                return dict(b.input)
+        assistant = {"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in r.content]}
+        appel = next((b for b in r.content if b.type == "tool_use" and b.name == "repondre"), None)
+        if appel is not None:
+            rep = dict(appel.input)
+            manque = [k for k in schema.get("required", []) if k not in rep]
+            if not manque or deja_relance:
+                return completer(rep, schema)
+            # Réponse incomplète : on la renvoie une fois à l'IA en lui disant ce qui manque
+            deja_relance = True
+            messages += [assistant, {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": appel.id, "is_error": True,
+                "content": f"Réponse incomplète : il manque {', '.join(manque)}. "
+                           "Rappelle `repondre` avec TOUS les champs."}]}]
+            continue
         # Recherche web en cours (pause) ou réponse sans l'outil : on relance en continuant
-        messages.append({"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in r.content]})
+        messages.append(assistant)
         if r.stop_reason != "pause_turn":
             messages.append({"role": "user", "content": "Rends maintenant ta réponse avec l'outil `repondre`."})
             choix = {"type": "tool", "name": "repondre"}
     raise RuntimeError(f"{agent} : pas de réponse structurée")
+
+
+_DEFAUTS = {"array": list, "string": str, "boolean": lambda: False, "object": dict}
+
+
+def completer(rep: dict, schema: dict) -> dict:
+    """Champs obligatoires encore absents : valeur vide du bon type (une liste vide plutôt qu'un plantage)."""
+    for k in schema.get("required", []):
+        if k not in rep:
+            t = (schema.get("properties", {}).get(k, {}) or {}).get("type")
+            t = t[0] if isinstance(t, list) else t
+            if t in _DEFAUTS:
+                rep[k] = _DEFAUTS[t]()
+            elif t in ("integer", "number") or (isinstance(t, list) and "null" in t):
+                rep[k] = None
+    return rep
 
 
 def _appel(modele, systeme, messages, tools, choix, max_tokens):
