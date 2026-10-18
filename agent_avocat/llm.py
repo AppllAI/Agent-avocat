@@ -63,10 +63,11 @@ CONSIGNE_OUTIL = "\n\nTermine TOUJOURS en appelant l'outil `repondre` avec ta r�
 
 def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
              web: bool = False, recherches_max: int = 5, max_tokens: int = 1500,
-             priorite: str = "essentiel", pdf: bytes | None = None) -> dict:
+             priorite: str = "essentiel", pdf: bytes | None = None, reflexion: bool = True) -> dict:
     """Pose une question à l'IA et renvoie un dict conforme à `schema`.
     priorite="fond" : s'arrête plus tôt dans la journée pour garder du budget pour l'essentiel.
-    pdf : un document PDF que l'IA lit directement (ex. le CV, même scanné)."""
+    pdf : un document PDF que l'IA lit directement (ex. le CV, même scanné).
+    reflexion=False : le modèle répond sans « réfléchir » d'abord (moins cher, plus rapide), si le modèle le permet."""
     if config.simulation():
         from . import simulation
 
@@ -101,7 +102,7 @@ def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
     for tour in range(6):
         if modele in _SANS_FORCAGE:
             choix = {"type": "auto"}
-        r = _appel(modele, systeme + CONSIGNE_OUTIL, messages, tools, choix, max_tokens)
+        r = _appel(modele, systeme + CONSIGNE_OUTIL, messages, tools, choix, max_tokens, reflexion)
         _compter(agent, tier, modele, r.usage)
         if r.stop_reason == "max_tokens" and not any(b.type == "tool_use" and b.name == "repondre" for b in r.content):
             # Coupé avant la fin : on recommence avec plus de place, sans garder le morceau tronqué
@@ -146,24 +147,33 @@ def completer(rep: dict, schema: dict) -> dict:
     return rep
 
 
-def _appel(modele, systeme, messages, tools, choix, max_tokens):
+_SANS_REGLAGE_REFLEXION: set[str] = set()
+
+
+def _appel(modele, systeme, messages, tools, choix, max_tokens, reflexion=True):
     import anthropic
 
-    for essai in range(4):
+    for essai in range(5):
+        extra = {}
+        if not reflexion and modele not in _SANS_REGLAGE_REFLEXION:
+            extra["thinking"] = {"type": "between_tools"}     # pas de réflexion préalable
         try:
             return _api().messages.create(
                 model=modele, max_tokens=max_tokens,
                 system=[{"type": "text", "text": systeme, "cache_control": {"type": "ephemeral"}}],
-                messages=messages, tools=tools, tool_choice=choix,
+                messages=messages, tools=tools, tool_choice=choix, **extra,
             )
         except anthropic.BadRequestError as e:
+            if "thinking" in str(e) and extra:
+                _SANS_REGLAGE_REFLEXION.add(modele)   # ce modèle ne se règle pas : on n'insiste pas
+                continue
             if "tool_choice" in str(e) and choix.get("type") != "auto":
                 _SANS_FORCAGE.add(modele)          # ce modèle ne veut pas d'outil forcé : on passe en « auto »
                 choix = {"type": "auto"}
                 continue
             raise
         except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError):
-            if essai == 3:
+            if essai >= 3:
                 raise
             time.sleep(5 * 2 ** essai)
 

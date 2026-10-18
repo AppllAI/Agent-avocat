@@ -5,7 +5,8 @@ Ce qui fait la différence (recruteurs et études) : une lettre visiblement écr
 lisible en 30 secondes, où chaque qualité est prouvée par un fait.
 
 Règles absolues :
-- Tu n'utilises QUE les faits du profil. Jamais d'expérience, de note, de langue, de date inventée.
+- Tu n'utilises QUE les faits du profil. Jamais d'expérience, de note, de langue, de date, de DURÉE inventée,
+  ni de détail ajouté sur le contenu d'un travail (thèmes d'un mémoire, dossiers traités) qui n'est pas écrit.
   Si un élément utile manque, tu fais sans — tu ne combles pas.
 - Appuie-toi sur `pourquoi` (les liens profil ↔ offre trouvés par l'Évaluateur) et sur `faits_employeur`.
   L'accroche doit être impossible à envoyer à un autre employeur.

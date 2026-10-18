@@ -9,8 +9,10 @@ Barème (note globale /10) :
 - **5-6** : générique (pourrait partir à n'importe quel cabinet) ou maladroite.
 - **1-3** : contient une INVENTION, le mauvais employeur, un texte à trous ou des fautes graves.
 
-Bloquant (`invention: true`, note ≤ 3) : un fait sur la personne absent du profil (expérience, note, langue, date,
-compétence), le nom d'un autre employeur, un texte à trous ([…], XXX).
+Bloquant (`invention: true`, note ≤ 3) : un fait sur la personne absent du profil — expérience, note, langue, date,
+DURÉE (« pendant un an » si le profil dit 3 mois), compétence, ou DÉTAIL sur le contenu d'un travail
+(ex. les thèmes précis d'un mémoire que le profil ne cite pas) —, le nom d'un autre employeur, un texte à trous.
+Vérifie chaque chiffre et chaque durée de la lettre contre le profil, un par un.
 
 Ce qui n'est PAS un défaut (ne pas pénaliser, ne pas demander) :
 - « Madame, Monsieur, » ou « Maître, » quand aucun destinataire nommé n'est fourni — c'est l'usage.

@@ -18,6 +18,34 @@ def _jetons(nom: str) -> list[str]:
     return [m for m in re.findall(r"[a-z0-9]+", outils.sans_accents(nom)) if len(m) >= 4 and m not in MOTS_VIDES]
 
 
+NOMBRES = {"un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6, "sept": 7, "huit": 8,
+           "neuf": 9, "dix": 10, "douze": 12, "quinze": 15, "vingt": 20}
+_DUREE = re.compile(r"\b(\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|douze|quinze|vingt)\s+"
+                    r"(ans?|annees?|mois|semaines?|jours?)\b")
+_CHIFFRE = re.compile(r"\b\d+(?:[.,/]\d+)?\b")
+
+
+def _norm(t: str) -> str:
+    t = outils.sans_accents(t)
+    return re.sub(r"\b(" + "|".join(NOMBRES) + r")\b", lambda m: str(NOMBRES[m.group(1)]), t)
+
+
+def chiffres_inventes(lettre: str, sources: str) -> list[str]:
+    """Durées et chiffres de la lettre qu'on ne retrouve NI dans le profil NI dans l'offre (ex. « pendant un an »
+    alors que le CV dit « 3 mois »). Gratuit, sans IA : attrape ce que le Juge peut laisser passer."""
+    src = _norm(sources)
+    suspects = []
+    for m in _DUREE.finditer(_norm(lettre)):
+        n = m.group(1)
+        unite = m.group(2)[:3]
+        if not re.search(rf"\b{n}\s*\(?\s*{unite}", src):
+            suspects.append(m.group(0))
+    for c in _CHIFFRE.findall(lettre):
+        if len(c) <= 4 and c not in sources and not (len(c) == 4 and c.startswith("20")):  # années : déjà vérifiées par le Juge
+            suspects.append(c)
+    return sorted(set(suspects))
+
+
 def problemes(o) -> list[str]:
     o = dict(o)
     p = []

@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from .. import config, db, llm, messagerie
@@ -88,6 +90,13 @@ def ecrire_une(o) -> dict:
                          json.dumps({"offre": demande["offre"], "candidature": r}, ensure_ascii=False),
                          SCHEMA_JUGE, max_tokens=700)
         note = 1 if j.get("invention") else int(j.get("note") or 1)
+        from .controle import chiffres_inventes
+        suspects = chiffres_inventes(f"{r.get('lettre', '')}\n{r.get('email', '')}",
+                                     f"{profil}\n{json.dumps(demande['offre'], ensure_ascii=False)}\n{aujourdhui}")
+        if suspects:
+            note = min(note, 4)
+            j["corrections"] = [f"Retire ou corrige « {s} » : ce chiffre/cette durée n'est ni dans le profil ni dans "
+                                "l'offre." for s in suspects[:3]] + list(j.get("corrections") or [])[:2]
         if meilleure is None or note > meilleure["note"]:
             meilleure = {**r, "note": note, "corrections": j.get("corrections") or []}
         if note >= regles["note_lettre_minimum"]:
@@ -107,10 +116,15 @@ def rediger(limite: int = 8):
     # les offres les plus fraîches d'abord : postuler dans les 4 premiers jours multiplie les chances
     offres = db.q("SELECT * FROM offres WHERE statut='qualifiee' AND infos_cabinet IS NOT NULL "
                   "ORDER BY COALESCE(publie_le, date(cree_le)) DESC, score DESC LIMIT ?", limite)
-    for o in offres:
+    budget_epuise = threading.Event()
+
+    def traiter(o):
+        if budget_epuise.is_set():
+            return
         try:
             v = ecrire_une(o)
         except llm.BudgetDepasse:
+            budget_epuise.set()
             return
         except Exception as e:
             essais = (o["tentatives"] or 0) + 1
@@ -120,7 +134,7 @@ def rediger(limite: int = 8):
                 db.changer_statut(o["id"], "erreur", "redacteur", f"lettre impossible : {e}")
                 messagerie.dire(f"⚠️ Je n'arrive pas à écrire la lettre pour *{o['entreprise'] or o['titre']}* "
                                 f"({type(e).__name__}). Je l'ai mise de côté.")
-            continue
+            return
         ecrire_pdf(v["lettre"], dossier / f"lettre_{o['id']}.pdf")
         bonne = v["note"] >= regles["note_lettre_minimum"]
         db.changer_statut(o["id"], "redigee", "redacteur",
@@ -128,6 +142,10 @@ def rediger(limite: int = 8):
                           lettre=v["lettre"], objet_mail=v["objet"], corps_mail=v["email"], note_lettre=v["note"])
         auto = regles["mode"] == "auto" and bonne
         db.changer_statut(o["id"], "validee" if auto else "a_valider", "redacteur")
+
+    # 3 lettres en même temps : 3× plus rapide, même coût
+    with ThreadPoolExecutor(3) as ex:
+        list(ex.map(traiter, offres))
 
 
 def chemin_lettre(offre_id: int):

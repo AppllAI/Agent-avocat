@@ -194,6 +194,14 @@ class Controleur(unittest.TestCase):
         self.assertTrue(any("longueur" in x for x in p))
 
 
+class ChiffresInventes(unittest.TestCase):
+    def test_duree_inventee_detectee(self):
+        profil = "Stagiaire, étude Lambert, 2025 (3 mois). Mémoire (16/20). Job 2024 (2 mois). 0470 12 34 56"
+        self.assertEqual(controle.chiffres_inventes("Pendant un an, j'ai étudié la copropriété.", profil), ["1 an"])
+        self.assertEqual(controle.chiffres_inventes("Mon stage de trois mois, noté 16/20, en 2025.", profil), [])
+        self.assertEqual(controle.chiffres_inventes("Une équipe de 40 avocats.", profil), ["40"])
+
+
 class LexGO(unittest.TestCase):
     def test_lecture_api(self):
         def faux(url, params=None, etag_cle=None):

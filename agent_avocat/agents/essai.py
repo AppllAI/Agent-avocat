@@ -124,12 +124,19 @@ def banc_essai() -> Path:
     lignes = ["# Banc d'essai — qualité des candidatures\n",
               f"Profil : {len(config.profil_texte())} caractères · mode {config.regles_envoi()['mode']}\n"]
     notes = []
-    for i, o in enumerate(offres, 1):
-        print(f"[{i}/{len(offres)}] {o['titre']} — {o['entreprise']}", flush=True)
+
+    def un(o):
         try:
-            r = analyser(o)
+            return analyser(o)
         except Exception as e:
-            lignes.append(f"\n## {i}. {o['titre']} — ÉCHEC : {e}\n")
+            return e
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(3) as ex:          # 3 offres en même temps : ~3× plus rapide
+        resultats = list(ex.map(un, offres))
+    for i, (o, r) in enumerate(zip(offres, resultats), 1):
+        if isinstance(r, Exception):
+            lignes.append(f"\n## {i}. {o['titre']} — ÉCHEC : {r}\n")
             continue
         if r["candidature"]:
             notes.append(r["candidature"]["note"])
