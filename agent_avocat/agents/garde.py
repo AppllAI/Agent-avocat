@@ -8,18 +8,24 @@ from .. import config, db
 from ..outils import sans_accents
 
 # Synonymes : "droit pénal" exclu doit aussi attraper "criminel", "correctionnel"…
-SYNONYMES = {
-    "droit penal": ["penal", "criminel", "correctionnel", "infraction", "parquet", "cour d'assises", "droit penal"],
-    "droit immobilier": ["immobilier", "bail", "copropriete", "urbanisme", "construction", "notarial"],
-    "droit des societes": ["societes", "corporate", "m&a", "fusions", "gouvernance"],
-    "droit social": ["droit social", "droit du travail", "employment", "securite sociale"],
-    "droit fiscal": ["fiscal", "tax", "tva", "impots"],
-    "droit familial": ["familial", "famille", "divorce", "filiation", "successions"],
-    "droit administratif": ["administratif", "conseil d'etat", "marches publics", "public law"],
-    "droit europeen": ["europeen", "eu law", "concurrence", "competition"],
-    "droit commercial": ["commercial", "contrats", "distribution", "insolvabilite", "faillite"],
-    "propriete intellectuelle": ["propriete intellectuelle", "ip ", "marques", "brevets", "droit d'auteur"],
-    "droit des etrangers": ["etrangers", "asile", "immigration", "sejour"],
+SYNONYMES = {   # FR / NL / EN : les offres belges arrivent dans les trois langues
+    "droit penal": ["penal", "criminel", "correctionnel", "infraction", "parquet", "cour d'assises",
+                    "criminal", "strafrecht", "white collar"],
+    "droit immobilier": ["immobilier", "bail", "baux", "copropriete", "urbanisme", "construction", "notarial",
+                         "real estate", "vastgoed", "huur", "bouwrecht", "stedenbouw"],
+    "droit des societes": ["societes", "corporate", "m&a", "fusions", "gouvernance", "vennootschap"],
+    "droit social": ["droit social", "droit du travail", "employment", "labour", "labor", "arbeidsrecht",
+                     "sociaal recht", "securite sociale"],
+    "droit fiscal": ["fiscal", "tax", "tva", "impots", "fiscaal", "belasting"],
+    "droit familial": ["familial", "famille", "divorce", "filiation", "successions", "family", "familierecht"],
+    "droit administratif": ["administratif", "conseil d'etat", "marches publics", "public law", "bestuursrecht",
+                            "overheidsopdrachten"],
+    "droit europeen": ["europeen", "eu law", "european", "concurrence", "competition", "mededinging"],
+    "droit commercial": ["commercial", "contrats", "distribution", "insolvabilite", "faillite", "handelsrecht",
+                         "insolvency"],
+    "propriete intellectuelle": ["propriete intellectuelle", "intellectual property", "marques", "brevets",
+                                 "droit d'auteur", "trademark", "intellectuele eigendom"],
+    "droit des etrangers": ["etrangers", "asile", "immigration", "sejour", "vreemdelingenrecht"],
 }
 
 

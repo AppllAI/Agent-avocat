@@ -13,6 +13,10 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 _PISTEURS = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "from", "src", "trk"}
 RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _EMAILS_IGNORES = ("noreply", "no-reply", "privacy", "gdpr", "dpo@", "webmaster", "example.", "sentry", "wixpress")
+# Adresses des SITES d'emploi eux-mêmes : y envoyer une candidature serait une bourde (ce n'est pas l'employeur)
+SITES_EMPLOI = ("lexgo.", "jobat.", "stepstone.", "indeed.", "legalworld.", "references.be", "actiris.", "leforem.",
+                "vdab.", "linkedin.", "glassdoor.", "monster.", "talent.com", "jobted.", "optioncarriere.", "jooble.",
+                "kapitalis.", "jobsinbrussels.", "ictjob.", "justifit.")
 
 
 def sans_accents(s: str) -> str:
@@ -101,7 +105,9 @@ def emails_dans(texte: str) -> list[str]:
     vus = []
     for e in RE_EMAIL.findall(texte or ""):
         e = e.strip(".").lower()
-        if not any(x in e for x in _EMAILS_IGNORES) and not e.endswith((".png", ".jpg", ".gif", ".webp")) and e not in vus:
+        dom = e.split("@")[-1]
+        if (not any(x in e for x in _EMAILS_IGNORES) and not any(s in dom for s in SITES_EMPLOI)
+                and not e.endswith((".png", ".jpg", ".gif", ".webp")) and e not in vus):
             vus.append(e)
     return vus
 

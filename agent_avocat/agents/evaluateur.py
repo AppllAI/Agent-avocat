@@ -22,29 +22,55 @@ CHAMPS = ("id", "source", "titre", "entreprise", "ville", "matiere", "contrat", 
 
 
 def evaluer(taille_lot: int = 8):
+    if not config.profil_texte().strip():
+        return 0          # sans ton profil, toute note serait fausse : on attend la lecture du CV
     dom, regles = config.domaine_actif(), config.regles_envoi()
     offres = [dict(o) for o in db.q("SELECT * FROM offres WHERE statut='enrichie' ORDER BY id")]
     systeme = llm.prompt("evaluateur") + "\n\n## Objectif\n" + json.dumps(dom, ensure_ascii=False) + \
-        "\n\n## Profil\n" + (config.profil_texte() or "(profil non rempli)")
+        "\n\n## Profil\n" + config.profil_texte()
     retenues = 0
     for i in range(0, len(offres), taille_lot):
         lot = offres[i:i + taille_lot]
         contenu = json.dumps([{k: (o[k][:1500] if k == "description" and o[k] else o[k]) for k in CHAMPS}
                               for o in lot], ensure_ascii=False)
         try:
-            notes = llm.demander("evaluateur", "rapide", systeme, contenu, SCHEMA, max_tokens=1200)["notes"]
+            notes = llm.demander("evaluateur", "rapide", systeme, contenu, SCHEMA, max_tokens=2500)["notes"]
         except llm.BudgetDepasse:
             return retenues
         except Exception as e:
-            db.journal("evaluateur", f"lot en échec, réessai au prochain cycle : {e}")
-            continue
-        ids = {o["id"] for o in lot}
+            db.journal("evaluateur", f"lot en échec, réessai au prochain cycle : {type(e).__name__}: {e}")
+            notes = []
+        notees = set()
         for n in notes:
-            if n["id"] not in ids:
+            try:
+                oid, score = int(n.get("id")), int(n.get("score") or 1)
+            except (TypeError, ValueError):
                 continue
-            ok = not n["regle_violee"] and n["score"] >= regles["score_minimum"]
-            db.changer_statut(n["id"], "qualifiee" if ok else "ecartee", "evaluateur",
-                              f"{n['score']}/10 · {n['raison']}", score=n["score"],
+            if oid not in {o["id"] for o in lot} or oid in notees:
+                continue
+            notees.add(oid)
+            ok = not n.get("regle_violee") and score >= regles["score_minimum"]
+            db.changer_statut(oid, "qualifiee" if ok else "ecartee", "evaluateur",
+                              f"{score}/10 · {n.get('raison') or ''}", score=score,
                               pourquoi=json.dumps(n.get("pourquoi") or [], ensure_ascii=False))
             retenues += ok
+        # Offres oubliées par l'IA : 3 essais max, puis on les met de côté (sinon on paie en boucle)
+        for o in lot:
+            if o["id"] not in notees:
+                essais = (o["tentatives"] or 0) + 1
+                db.maj(o["id"], tentatives=essais)
+                if essais >= 3:
+                    db.changer_statut(o["id"], "erreur", "evaluateur", "impossible à noter")
     return retenues
+
+
+def reevaluer_recentes(jours: int = 21, regles_aussi: bool = False) -> int:
+    """Quand ton profil ou ton objectif change : les offres récentes écartées par la NOTE (pas par tes règles)
+    sont notées à nouveau."""
+    with db.tx() as c:
+        cur = c.execute(
+            "UPDATE offres SET statut='enrichie', tentatives=0, maj_le=CURRENT_TIMESTAMP "
+            "WHERE statut='ecartee' AND date(cree_le) >= date('now', ?) AND id IN "
+            "(SELECT offre_id FROM evenements WHERE agent IN (?, ?) AND quoi LIKE '→ ecartee%')",
+            (f"-{jours} days", "evaluateur", "garde" if regles_aussi else "evaluateur"))
+        return cur.rowcount

@@ -63,9 +63,10 @@ CONSIGNE_OUTIL = "\n\nTermine TOUJOURS en appelant l'outil `repondre` avec ta r�
 
 def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
              web: bool = False, recherches_max: int = 5, max_tokens: int = 1500,
-             priorite: str = "essentiel") -> dict:
+             priorite: str = "essentiel", pdf: bytes | None = None) -> dict:
     """Pose une question à l'IA et renvoie un dict conforme à `schema`.
-    priorite="fond" : s'arrête plus tôt dans la journée pour garder du budget pour l'essentiel."""
+    priorite="fond" : s'arrête plus tôt dans la journée pour garder du budget pour l'essentiel.
+    pdf : un document PDF que l'IA lit directement (ex. le CV, même scanné)."""
     if config.simulation():
         from . import simulation
 
@@ -85,14 +86,28 @@ def demander(agent: str, tier: str, systeme: str, contenu: str, schema: dict,
                  outil]
         choix = {"type": "auto"}
 
-    messages = [{"role": "user", "content": contenu}]
+    if pdf:
+        import base64
+        premier = [{"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                                    "data": base64.b64encode(pdf).decode()}},
+                   {"type": "text", "text": contenu}]
+    else:
+        premier = contenu
+    messages = [{"role": "user", "content": premier}]
     modele = MODELES[tier]()
+    # Les modèles récents « réfléchissent » avant de répondre : cette réflexion compte dans max_tokens.
+    max_tokens = max(max_tokens, 8000 if tier == "qualite" else 3000)
     deja_relance = False
     for tour in range(6):
         if modele in _SANS_FORCAGE:
             choix = {"type": "auto"}
         r = _appel(modele, systeme + CONSIGNE_OUTIL, messages, tools, choix, max_tokens)
         _compter(agent, tier, modele, r.usage)
+        if r.stop_reason == "max_tokens" and not any(b.type == "tool_use" and b.name == "repondre" for b in r.content):
+            # Coupé avant la fin : on recommence avec plus de place, sans garder le morceau tronqué
+            max_tokens = min(max_tokens * 2, 20000)   # au-delà, le SDK exige le streaming
+            db.journal(agent, f"réponse coupée, nouvel essai avec {max_tokens} jetons")
+            continue
         assistant = {"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in r.content]}
         appel = next((b for b in r.content if b.type == "tool_use" and b.name == "repondre"), None)
         if appel is not None:

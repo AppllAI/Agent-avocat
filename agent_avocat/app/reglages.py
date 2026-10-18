@@ -36,6 +36,23 @@ AIDE_MOT_DE_PASSE = {
 LIEN_CLE_API = "https://console.anthropic.com/settings/keys"
 
 
+_verrou = None
+
+
+def verrou_instance() -> bool:
+    """True si on est la seule application ouverte. Deux instances = emails envoyés en double et
+    Telegram qui se bloque (erreur 409) : on l'empêche."""
+    global _verrou
+    import socket
+    _verrou = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        _verrou.bind(("127.0.0.1", 47613))
+        _verrou.listen(1)
+        return True
+    except OSError:
+        return False
+
+
 def gele() -> bool:
     """True quand on tourne dans l'application empaquetée (PyInstaller)."""
     return getattr(sys, "frozen", False)

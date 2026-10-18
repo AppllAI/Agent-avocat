@@ -74,14 +74,28 @@ def _boite():
             yield f.name, f.read_bytes()
             f.rename(f.with_suffix(".lu"))
         return
-    m = imaplib.IMAP4_SSL(config.env("IMAP_HOTE", "imap.gmail.com"))
-    m.login(config.env("EMAIL_ADRESSE"), config.env("EMAIL_MOT_DE_PASSE"))
-    m.select("INBOX")
-    _, ids = m.search(None, "UNSEEN")
-    for num in ids[0].split():
-        _, data = m.fetch(num, "(BODY.PEEK[])")   # PEEK : on ne marque pas comme lu
-        yield None, data[0][1]
-    m.logout()
+    # On ne relit jamais deux fois le même email : on retient le numéro (UID) du dernier email vu.
+    m = imaplib.IMAP4_SSL(config.env("IMAP_HOTE", "imap.gmail.com"), timeout=60)
+    try:
+        m.login(config.env("EMAIL_ADRESSE"), config.env("EMAIL_MOT_DE_PASSE"))
+        m.select("INBOX", readonly=True)            # lecture seule : tes emails restent « non lus »
+        dernier = db.kv_get("imap_dernier_uid")
+        if dernier is None:                          # 1er lancement : on ignore l'historique de la boîte
+            _, d = m.uid("search", None, "ALL")
+            uids = d[0].split()
+            db.kv_set("imap_dernier_uid", int(uids[-1]) if uids else 0)
+            return
+        _, d = m.uid("search", None, f"UID {int(dernier) + 1}:*")
+        for uid in [u for u in d[0].split() if int(u) > int(dernier)][:50]:
+            _, data = m.uid("fetch", uid, "(BODY.PEEK[])")
+            if data and isinstance(data[0], tuple):
+                yield None, data[0][1]
+            db.kv_set("imap_dernier_uid", int(uid))
+    finally:
+        try:
+            m.logout()
+        except Exception:
+            pass
 
 
 def relever():

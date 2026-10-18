@@ -291,6 +291,8 @@ def _essai(url):
 def _banc():
     """« teste-toi » / « je veux d'abord voir si ça marche » : 5 lettres d'exemple notées, rien n'est envoyé."""
     from .essai import banc_essai
+    if not config.profil_texte().strip():
+        return messagerie.dire("📄 Envoie-moi d'abord ton CV en PDF : sans lui, je ne peux pas écrire de vraies lettres.")
     messagerie.dire("🧪 Je me teste sur 5 offres d'exemple (lettres + notes du Juge). Rien n'est envoyé. ~3 min, "
                     "je te préviens quand c'est prêt.")
     f = banc_essai()

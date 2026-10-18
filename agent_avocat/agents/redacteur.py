@@ -81,7 +81,9 @@ def ecrire_une(o) -> dict:
     meilleure = None
     for _ in range(3):
         r = llm.demander("redacteur", "qualite", systeme_r, json.dumps(demande, ensure_ascii=False),
-                         SCHEMA_LETTRE, max_tokens=2200)
+                         SCHEMA_LETTRE, max_tokens=8000)
+        if len((r.get("lettre") or "").split()) < 120 or not r.get("email") or not r.get("objet"):
+            raise ValueError("lettre vide ou incomplète renvoyée par l'IA")
         j = llm.demander("juge", "rapide", systeme_j,
                          json.dumps({"offre": demande["offre"], "candidature": r}, ensure_ascii=False),
                          SCHEMA_JUGE, max_tokens=700)
@@ -90,7 +92,7 @@ def ecrire_une(o) -> dict:
             meilleure = {**r, "note": note, "corrections": j.get("corrections") or []}
         if note >= regles["note_lettre_minimum"]:
             break
-        demande["corrections_a_appliquer"] = j["corrections"]
+        demande["corrections_a_appliquer"] = j.get("corrections") or ["Rends la lettre plus spécifique à cet employeur."]
         demande["version_precedente"] = r
     return meilleure
 

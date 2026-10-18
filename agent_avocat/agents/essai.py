@@ -47,7 +47,7 @@ def analyser(o: dict) -> dict:
                      evaluateur.SCHEMA, max_tokens=600)["notes"][0]
     rapport["evaluation"] = n
     o["score"], o["pourquoi"] = n["score"], json.dumps(n.get("pourquoi") or [], ensure_ascii=False)
-    if o.get("entreprise") and o["source"] != "spontanee":
+    if o.get("entreprise") and o["source"] != "spontanee" and "fictif" not in o["entreprise"]:
         try:
             e = llm.demander("enqueteur", "rapide", llm.prompt("enqueteur"),
                              json.dumps({"employeur": o["entreprise"], "ville": o.get("ville"), "poste": o.get("titre"),

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
@@ -79,6 +80,7 @@ def _lexgo(dom: dict) -> list[dict]:
             if not url or url in connus or details >= 40:
                 continue
             try:
+                time.sleep(1.1)          # LexGO autorise 60 requêtes / minute
                 d = _get_json(f"{LEXGO}/jobs/{j['id']}")
                 details += 1
             except Exception:
@@ -92,8 +94,10 @@ def _lexgo(dom: dict) -> list[dict]:
                 "ville": (d.get("location") or {}).get("city"),
                 "matiere": ", ".join(x.get("fr_name") or x.get("en_name") or "" for x in d.get("disciplines") or []) or None,
                 "contrat": ", ".join(k for k in ("permanent", "temporary", "self_employed") if c.get(k)) or None,
-                "langue": ", ".join(d.get("languages") or []) or None,
-                "description": (desc.get("fr") or desc.get("en") or desc.get("nl") or "")[:5000],
+                "langue": None,   # LexGO donne la langue de l'ANNONCE, pas la langue exigée
+                "description": ((f"[Annonce rédigée en : {', '.join(d.get('languages') or [])}] "
+                                 if d.get("languages") else "")
+                                + (desc.get("fr") or desc.get("en") or desc.get("nl") or ""))[:5000],
                 "publie_le": (d.get("published_at") or "")[:10] or None,
                 "mode_candidature": "formulaire",
             })
@@ -187,6 +191,7 @@ def enregistrer(offres: list[dict]) -> int:
         for o in offres:
             if not o.get("url") or not o.get("titre"):
                 continue
+            o["email_contact"] = (outils.emails_dans(o.get("email_contact") or "") or [None])[0]
             cle = outils.cle_offre(o["url"], o.get("entreprise"), o.get("titre"))
             cur = c.execute(
                 """INSERT OR IGNORE INTO offres (cle, url, source, titre, entreprise, ville, matiere, contrat, langue,

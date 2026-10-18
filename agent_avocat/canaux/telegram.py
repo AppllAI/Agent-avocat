@@ -121,8 +121,20 @@ class Telegram:
             try:
                 maj = self._post("getUpdates", data={"timeout": 50, "offset": decalage,
                                                      "allowed_updates": '["message","callback_query"]'})
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 409:
+                    print("Telegram : ce bot est déjà utilisé par un AUTRE programme (agent ouvert deux fois, "
+                          "ou sur un autre PC). Ferme l'autre.", flush=True)
+                    time.sleep(30)
+                elif e.response is not None and e.response.status_code == 401:
+                    print("Telegram : jeton refusé. Vérifie-le dans ⚙ Réglages (ou BotFather → Revoke).", flush=True)
+                    time.sleep(60)
+                else:
+                    print("Telegram :", e, flush=True)
+                    time.sleep(10)
+                continue
             except Exception as e:
-                print("Telegram :", e, flush=True)
+                print("Telegram : pas de connexion internet ?", type(e).__name__, flush=True)
                 time.sleep(10)
                 continue
             for u in maj:

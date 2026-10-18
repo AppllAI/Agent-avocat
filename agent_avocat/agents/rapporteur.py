@@ -22,6 +22,12 @@ def stats() -> str:
                f"sans réponse : {s.get('sans_reponse', 0)}",
                f"Offres écartées par tes règles : {s.get('ecartee', 0)}",
                f"Coût IA : {llm.depense_du_jour():.2f} € aujourd'hui · {total:.2f} € au total"]
+    top = db.q("SELECT agent, SUM(eur) AS e FROM couts WHERE date(le)=date('now') GROUP BY agent ORDER BY e DESC LIMIT 4")
+    if top:
+        lignes.append("Dont : " + " · ".join(f"{r['agent']} {r['e']:.2f} €" for r in top))
+    erreurs = db.q1("SELECT COUNT(*) AS n FROM offres WHERE statut='erreur'")["n"]
+    if erreurs:
+        lignes.append(f"⚠️ Offres mises de côté après erreur : {erreurs}")
     return "\n".join(lignes)
 
 

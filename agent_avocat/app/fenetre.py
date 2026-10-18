@@ -308,6 +308,8 @@ class Application(tk.Tk):
     def _ajouter(self, widget, texte, tag=None):
         widget.configure(state="normal")
         widget.insert("end", texte + "\n", tag)
+        if int(widget.index("end-1c").split(".")[0]) > 3000:     # l'app tourne H24 : on garde les 3000 dernières lignes
+            widget.delete("1.0", "1000.0")
         widget.configure(state="disabled")
         widget.see("end")
 
@@ -350,6 +352,7 @@ class Application(tk.Tk):
             self.after(1500, lambda: self._suivre_telegram(interne))
         self.canal = CanalApp(self.file, interne)
         empecher_veille()
+        demarrage_automatique(lambda t: self.file.put(("journal", t)))
 
         def lancer():
             from .. import orchestrateur
@@ -494,6 +497,21 @@ def ouvrir(chemin: Path):
         subprocess.Popen(["xdg-open", str(chemin)])
 
 
+def demarrage_automatique(journal):
+    """Windows : l'agent se relance tout seul après un redémarrage du PC (mises à jour Windows…)."""
+    if platform.system() != "Windows" or not reglages.gele():
+        return
+    try:
+        dossier = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+        f = dossier / "AgentAvocat.cmd"
+        contenu = f'@echo off\r\nstart "" "{sys.executable}"\r\n'
+        if not f.exists() or f.read_text(encoding="utf-8", errors="ignore") != contenu:
+            f.write_text(contenu, encoding="utf-8")
+            journal("Démarrage automatique activé : l'agent se relancera après un redémarrage du PC.")
+    except Exception as e:
+        journal(f"Démarrage automatique impossible : {e}")
+
+
 def empecher_veille():
     """L'agent doit tourner H24 : on empêche la mise en veille tant que l'application est ouverte."""
     try:
@@ -507,4 +525,10 @@ def empecher_veille():
 
 
 def main():
+    if not reglages.verrou_instance():
+        racine = tk.Tk()
+        racine.withdraw()
+        messagebox.showinfo("Agent Avocat", "Agent Avocat est déjà ouvert sur cet ordinateur.\n"
+                                            "Regarde dans la barre des tâches (ou ferme-le avant de le relancer).")
+        return
     Application().mainloop()

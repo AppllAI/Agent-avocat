@@ -70,11 +70,15 @@ def parler(texte: str):
                          SCHEMA_COACH, max_tokens=900)
     except llm.BudgetDepasse as e:
         return messagerie.dire(f"⏸️ {e}. On reprend demain !")
-    maj = {k: v for k, v in (r.get("objectif_maj") or {}).items() if v not in (None, "", [])}
+    permis = SCHEMA_COACH["properties"]["objectif_maj"]["properties"]
+    maj = {k: v for k, v in (r.get("objectif_maj") or {}).items() if k in permis and v not in (None, "", [])}
     if maj:
         dom.update(maj)
         config.sauver_objectif(o)
         db.journal("coach", f"objectif mis à jour : {', '.join(maj)}")
+        if onboarding_fini():   # tes critères ont changé : les offres récentes écartées sont revues
+            from .evaluateur import reevaluer_recentes
+            reevaluer_recentes(regles_aussi=True)
     messagerie.dire(r["reponse"])
     if r.get("termine") and config.chemin_cv().exists():
         db.kv_set("onboarding_fini", True)
@@ -87,23 +91,37 @@ def recevoir_cv(chemin: Path):
     if Path(chemin).resolve() != config.chemin_cv().resolve():
         shutil.copy(chemin, config.chemin_cv())
     texte = _texte_pdf(config.chemin_cv())
-    if not texte.strip():
-        return messagerie.dire("📄 CV bien reçu ! Je n'arrive pas à lire son texte (PDF scanné ?). "
-                               "Tu peux me renvoyer une version exportée depuis Word/Google Docs ?")
+    pdf = None
+    if len(texte.strip()) < 300:            # PDF scanné / image : Claude lit le PDF lui-même
+        pdf = config.chemin_cv().read_bytes()
+        if len(pdf) > 20_000_000:
+            return messagerie.dire("📄 Ton CV fait plus de 20 Mo, c'est trop lourd. Exporte-le à nouveau en PDF "
+                                   "depuis Word ou Google Docs et renvoie-le.")
+        texte = "Le CV est le document PDF joint."
     try:
         r = llm.demander("profileur", "qualite", llm.prompt("profileur"), texte[:12000], SCHEMA_PROFIL,
-                         max_tokens=2500)
+                         max_tokens=3000, pdf=pdf)
     except llm.BudgetDepasse as e:
         return messagerie.dire(f"⏸️ {e}.")
     except Exception as e:
         db.journal("profileur", f"lecture du CV en échec : {e}")
         return messagerie.dire("⚠️ Je n'ai pas réussi à analyser ton CV (erreur technique). Je réessaie tout seul "
                                "dans quelques minutes, pas besoin de le renvoyer.")
+    if len((r.get("fiche_markdown") or "").strip()) < 50:
+        db.journal("profileur", "fiche profil vide renvoyée par l'IA")
+        return messagerie.dire("⚠️ Je n'ai rien pu tirer de ce CV. Renvoie-le exporté en PDF depuis Word ou "
+                               "Google Docs (pas une photo).")
     (config.PROFIL_DIR / "profil.md").write_text(r["fiche_markdown"], encoding="utf-8")
     identite = {"NOM_CANDIDAT": r.get("nom"), "TELEPHONE": r.get("telephone")}
     db.kv_set("identite", identite)
     appliquer_identite()
-    msg = "📄 CV lu et enregistré ✅"
+    from .evaluateur import reevaluer_recentes
+    n = reevaluer_recentes()        # offres notées avant la lecture du CV : on les renote avec ton vrai profil
+    if n:
+        db.journal("profileur", f"{n} offre(s) remise(s) en évaluation avec ton profil")
+    apercu = "\n".join(l for l in r["fiche_markdown"].splitlines() if l.strip())[:700]
+    msg = f"📄 CV lu ✅ Voici ce que j'ai retenu (c'est la seule base de tes lettres) :\n\n{apercu}\n\n" \
+          "Si quelque chose est faux, dis-le-moi (« je parle aussi néerlandais B2 »…)."
     if r["manquants"]:
         msg += "\nIl me manque : " + ", ".join(r["manquants"]) + ". Tu peux me le dire quand tu veux."
     messagerie.dire(msg)
