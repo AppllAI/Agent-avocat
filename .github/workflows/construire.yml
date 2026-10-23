@@ -29,7 +29,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, pkg: node20-win-x64, ext: .exe, nom: Windows }
-          - { os: macos-latest, pkg: node20-macos-arm64, ext: "", nom: Mac }
+          - { os: macos-14, pkg: node20-macos-arm64, ext: "", nom: Mac }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -85,8 +85,8 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.3.0' }}
-          name: Agent Avocat ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.3.0' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.4.0' }}
+          name: Agent Avocat ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.4.0' }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           overwrite_files: true

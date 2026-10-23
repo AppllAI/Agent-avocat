@@ -62,12 +62,27 @@ def objectif() -> dict:
         return yaml.safe_load(f) or {}
 
 
+_ANCIENS_NOMS = {"matieres_uniquement": "secteurs_uniquement", "matieres_exclues": "secteurs_exclus",
+                 "disponibilite": "disponibilites"}
+
+
 def domaine_actif() -> dict:
     o = objectif()
-    return o.get("domaines", {}).get(o.get("domaine_actif"), {})
+    dom = dict(o.get("domaines", {}).get(o.get("domaine_actif"), {}))
+    for ancien, nouveau in _ANCIENS_NOMS.items():      # objectif créé par la v0.3 : mêmes règles, nouveau nom
+        if ancien in dom and not dom.get(nouveau):
+            dom[nouveau] = dom.pop(ancien)
+        else:
+            dom.pop(ancien, None)
+    return dom
 
 
 def sauver_objectif(o: dict) -> None:
+    for dom in (o.get("domaines") or {}).values():      # on réécrit avec les noms actuels
+        for ancien, nouveau in _ANCIENS_NOMS.items():
+            if isinstance(dom, dict) and ancien in dom:
+                v = dom.pop(ancien)
+                dom.setdefault(nouveau, v)
     OBJECTIF.parent.mkdir(parents=True, exist_ok=True)
     with open(OBJECTIF, "w", encoding="utf-8") as f:
         yaml.safe_dump(o, f, allow_unicode=True, sort_keys=False)
@@ -90,8 +105,33 @@ def style_texte() -> str:
 
 
 def profil_texte() -> str:
+    """Le profil (tiré du CV) + tes disponibilités déclarées : c'est la SEULE source de vérité des messages.
+    Les disponibilités en font partie, pour que le Juge puisse vérifier « disponible le samedi » contre ce que tu as dit."""
     f = PROFIL_DIR / "profil.md"
-    return f.read_text(encoding="utf-8") if f.exists() else ""
+    try:
+        texte = f.read_text(encoding="utf-8") if f.exists() else ""
+    except UnicodeDecodeError:              # fiche modifiée à la main avec le Bloc-notes (Windows)
+        texte = f.read_bytes().decode("cp1252", errors="replace")
+    if not texte.strip():
+        return ""
+    dom = domaine_actif()
+    dispo = [(lib, dom.get(k)) for lib, k in (("Disponibilités", "disponibilites"), ("Période", "periode"),
+                                              ("Heures max par semaine", "heures_max_par_semaine"),
+                                              ("Permis / véhicule", "permis_ou_vehicule"))]
+    lignes = [f"- {lib} : {v}" for lib, v in dispo if v not in (None, "", 0, [])]
+    return texte + ("\n\n## Disponibilités (déclarées par la personne)\n" + "\n".join(lignes) if lignes else "")
+
+
+def email_test() -> str:
+    """Mode test : les candidatures arrivent sur l'adresse écrite dans ton CV (sinon celle de l'agent)."""
+    import re
+    profil = profil_texte()
+    lignes = [l for l in profil.splitlines() if "mail" in l.lower()] + [profil]
+    for l in lignes:
+        m = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", l)
+        if m:
+            return m.group(0).lower()
+    return env("EMAIL_ADRESSE", "moi@exemple.be")
 
 
 def chemin_cv() -> Path:

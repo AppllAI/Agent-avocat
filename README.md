@@ -1,7 +1,7 @@
 # Agent Avocat ⚖️🤖
 
 Une équipe d'agents IA qui **cherche les offres juridiques en Belgique, écrit une lettre sur mesure pour chacune,
-postule, relance, trie les réponses** — et ne te dérange sur WhatsApp que quand il faut décider :
+postule, relance, trie les réponses** — et ne te dérange sur Telegram que quand il faut décider :
 « Le cabinet X te propose un entretien jeudi 24 décembre à 16h30, tu confirmes ? »
 
 Tu parles à l'agent comme à quelqu'un, **à l'écrit ou en vocal**. Les refus ? Tu n'en entends même pas parler.
@@ -11,14 +11,24 @@ Tu parles à l'agent comme à quelqu'un, **à l'écrit ou en vocal**. Les refus 
 1. Tu ouvres l'application, tu remplis : email, mot de passe d'application, clé API, jeton Telegram.
 2. Sur Telegram, l'agent te demande ton CV (PDF) et ce que tu cherches (écrit ou vocal) :
    « que du droit immobilier, Bruxelles ou Namur, jamais de pénal, CDI ou stage ».
-3. Il cherche en continu (LexGO, web, cabinets à contacter spontanément), écrit et fait noter chaque lettre,
+3. Il cherche en continu (LexGO, Indeed, Google Jobs, web, cabinets à contacter spontanément), écrit et fait noter chaque lettre,
    puis t'envoie des cartes : **[✅ Envoyer] [👁 Lettre] [❌ Non]**.
 4. Il envoie, relance après 8 jours, lit les réponses. Les refus ? Tu n'en entends pas parler.
 5. Entretien proposé → **[✅ Jeudi 16h30] [📆 Autre date]** → il répond au cabinet, t'envoie le rdv
    pour ton agenda, et la veille une fiche pour préparer l'entretien.
 
-On démarre en **mode répétition** 🧪 : tout est réel, mais les emails arrivent dans TA boîte.
+On démarre en **mode test** 🧪 : l'agent fait tout seul et envoie chaque candidature (lettre + CV en pièces
+jointes) à **l'adresse email écrite dans ton CV**, jamais aux cabinets. Rien sur Telegram. Quand tout te plaît :
+« mode validation », puis « vrai tout » pour envoyer pour de vrai celles que tu as reçues en test.
+
+Sur Telegram, tu parles au **Manager** comme à quelqu'un : « cherche maintenant », « envoie ici la lettre 12 »,
+« envoie-les sur mon autre mail », « note minimum 6 », « pause jusqu'au 15 janvier »… Il le fait, ou te dit
+clairement pourquoi ce n'est pas possible.
 Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+Si quelque chose ne marche pas, écris « **diagnostic** » : en 10 secondes, il vérifie la clé IA et le crédit, la boîte
+mail (envoi et lecture), le CV, la pause et le budget, et te dit précisément ce qui bloque. « budget 5 » change le
+plafond de dépense IA par jour. Crédit Claude épuisé ? Il te prévient une fois et reprend tout seul après la recharge.
 
 ## L'application (le plus simple)
 

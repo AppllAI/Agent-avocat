@@ -14,11 +14,12 @@
 ## Le circuit (qui parle à qui)
 
 Les agents ne bavardent pas entre eux : chacun lit les offres qui sont à **son** étape dans la base,
-fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **Concierge** te parle.
+fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **Manager** te parle : il comprend ta
+demande et la réalise avec ses outils (chercher, envoyer ici ou par email, régler, mettre en pause…).
 
 ```
  ┌── TROUVER ───────────────────────────────────────────────┐
- │ LexGO · Indeed · pages suivies (gratuit, toutes les 15 min)│
+ │ LexGO · Indeed · Google Jobs · pages (gratuit, 15 min)     │
  │ Éclaireur web (IA, toutes les heures)                      │──► offre « découverte »
  │ Prospecteur : cabinets à contacter spontanément (chaque matin)
  └───────────────────────────────────────────────────────────┘
@@ -33,7 +34,7 @@ fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **C
  └───────────────────────────────────────────────────────────┘      [✅ Envoyer] [👁 Lettre] [❌ Non]
  ┌── ENVOYER ────────────────────────────────────────────────┐
  │ Contrôleur : mauvais nom de cabinet ? texte à trous ? PJ ? │
- │ Envoyeur : répétition → TA boîte ; sinon → le cabinet      │
+ │ Envoyeur : test → l'email de ton CV ; sinon → le cabinet   │
  │ Relanceur : une relance polie à J+8                        │
  └───────────────────────────────────────────────────────────┘
  ┌── RÉPONSES ───────────────────────────────────────────────┐
@@ -42,7 +43,7 @@ fait son travail et les passe à l'étape suivante (champ `statut`). Seul le **C
  │             cabinet + .ics pour ton agenda                 │
  │ Préparateur : la veille, fiche d'entretien                 │
  └───────────────────────────────────────────────────────────┘
- Concierge ⇄ toi (Telegram) · Coach (ton objectif) · Profileur (ton CV) · Transcripteur (vocaux)
+ Manager ⇄ toi (Telegram) · Coach (ton objectif) · Profileur (ton CV) · Transcripteur (vocaux)
  Rapporteur (stats, bilan du soir) · Essayeur (tests sans envoi)
 ```
 
@@ -71,13 +72,13 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
 | Lettre + Juge | ~0,04 € (0,07 € si une réécriture) |
 | Offre écartée par tes règles | 0 € |
 | Recherche web | ~0,10 € (2-3 fois/jour) |
-| LexGO / Indeed | 0 € |
+| LexGO / Indeed / Google Jobs | 0 € |
 
 ## Ce qui se passe quand tu lances l'application
 
 1. Elle lit tes réglages (email, clé API, Telegram) et démarre les agents en arrière-plan.
 2. Premier lancement : le Coach t'écrit sur Telegram, te demande ton CV et ce que tu cherches.
-3. Ensuite, sans rien faire de ta part : veille toutes les 15 min, recherche web toutes les heures,
+3. Ensuite, sans rien faire de ta part : veille toutes les 15 min, recherche web 2 fois par jour,
    prospection chaque matin, boîte mail toutes les 5 min, envois toutes les 10 min en heures de bureau.
 4. Tu reçois une notification seulement quand il y a une décision : une candidature prête, un entretien,
    une question d'un recruteur, une offre à postuler via un site. Le soir, un petit bilan.
@@ -96,11 +97,12 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
    avec chaque lettre, sa note et les remarques du Juge. Coût ≈ 0,20 €. Tu juges la qualité à froid.
 2. **Essai d'une vraie offre** — sur Telegram : `essai https://…` → toute la chaîne sur cette offre,
    résultat et lettre PDF, **rien n'est envoyé**.
-3. **Mode répétition** (par défaut) — tout tourne pour de vrai, mais chaque email arrive dans **ta**
-   boîte avec l'objet `[RÉPÉTITION → adresse du cabinet]`, pièces jointes comprises. Bouton
-   « 🚀 L'envoyer pour de vrai » sur celles qui te plaisent.
+3. **Mode test** (par défaut) — tout tourne seul, pour de vrai, mais chaque candidature arrive sur
+   **l'email de ton CV** avec l'objet `[TEST n°12 → adresse du cabinet]`, pièces jointes comprises (même les
+   offres « via leur site », et celles que le Contrôleur bloquerait, avec l'explication). Rien sur Telegram.
+   « vrai 12 » ou « vrai tout » pour envoyer pour de vrai.
 4. **Mode validation** — `mode validation` : réel, rien ne part sans ton ✅.
-5. **Mode auto** — `mode auto` : il envoie seul les lettres notées ≥ 8/10 par le Juge.
+5. **Mode auto** — `mode auto` : il envoie seul les lettres notées ≥ 7/10 par le Juge (réglable).
 
 Tes remarques (« trop long », « parle de mon Erasmus ») vont dans `profil/style.md` et s'appliquent à toutes
 les lettres suivantes ; les lettres que tu valides servent de modèle de ton.

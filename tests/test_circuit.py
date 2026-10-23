@@ -51,6 +51,7 @@ class Circuit(unittest.TestCase):
     def setUpClass(cls):
         outils.telecharger = _hors_ligne
         sources._get_json = _hors_ligne                         # pas de vrai LexGO pendant les tests
+        sources._jobspy = lambda dom: []                        # ni Indeed ni Google
         orchestrateur.en_fond = lambda f, *a: f(*a)             # tout en synchrone
         orchestrateur.envoyer_bientot = orchestrateur._envoyer
         orchestrateur.declencher = lambda: None
@@ -65,43 +66,44 @@ class Circuit(unittest.TestCase):
         cv.write_bytes(b"%PDF-1.4 faux")
         concierge.recevoir(Entrant(fichier=cv, nom_fichier="mon_cv.pdf"))
         self.assertTrue(config.chemin_cv().exists())
-        (config.PROFIL_DIR / "profil.md").write_text("# Profil\n- Nom : Alex Test\n- Master en droit ULB\n")
+        (config.PROFIL_DIR / "profil.md").write_text("# Profil\n- Nom : Alex Test\n- Email : alex.test@exemple.be\n- Master en droit ULB\n",
+                                                      encoding="utf-8")
         concierge.recevoir(Entrant(texte="Je veux que du droit immobilier à Bruxelles"))
-        self.assertEqual(config.domaine_actif()["matieres_uniquement"], ["droit immobilier"])
+        self.assertEqual(config.domaine_actif()["secteurs_uniquement"], ["droit immobilier"])
         concierge.recevoir(Entrant(texte="ok lance"))
         self.assertTrue(db.kv_get("onboarding_fini"))
-        self.assertIn("🧪", self.dernier())                    # mode répétition par défaut, rappelé partout
+        self.assertEqual(config.regles_envoi()["mode"], "repetition")     # mode test par défaut
 
     def test_2_recherche_et_tri(self):
+        avant = len(self.canal.messages)
         orchestrateur.pipeline()
         st = {r["entreprise"]: (r["statut"], r["raison"]) for r in db.q("SELECT * FROM offres")}
         self.assertEqual(st["Cabinet Themis"][0], "ecartee")              # pénal exclu
         self.assertIn("matière exclue", st["Cabinet Themis"][1])
         self.assertEqual(st["Nordlex"][0], "ecartee")                     # hors matière / néerlandais
-        for e in ("Cabinet Lumen Avocats", "Delta & Associés", "Cabinet Horizon Immo"):
-            self.assertEqual(st[e][0], "a_valider", e)
+        # Mode test : tout est fait seul et part vers l'email du CV ; « via leur site » reste à faire plus tard
+        for e, attendu in (("Cabinet Lumen Avocats", "repetee"), ("Cabinet Horizon Immo", "repetee"),
+                           ("Delta & Associés", "manuelle")):
+            self.assertEqual(st[e][0], attendu, e)
         self.assertNotIn("Sans Email & Co", st)                            # spontanée sans email vérifié : non
         self.assertEqual(offre("Cabinet Horizon Immo")["source"], "spontanee")
         self.assertEqual(offre("Cabinet Lumen Avocats")["note_lettre"], 9)
         self.assertIn("copropriété", offre("Cabinet Lumen Avocats")["pourquoi"])
-        cartes = [b for b in self.canal.boutons if b and b[0][0][1].startswith("ok ")]
-        self.assertGreaterEqual(len(cartes), 3)                            # une carte + boutons par candidature
+        self.assertEqual(self.canal.messages[avant:], [])                 # mode test : RIEN sur la messagerie
+        self.assertEqual(self.canal.fichiers, [])
+        sortis = emails_sortis()
+        self.assertEqual(len(sortis), 3)                                   # y compris l'offre « via leur site »
+        import email
+        for f in sortis:
+            m = email.message_from_bytes(f.read_bytes())
+            self.assertEqual(m["To"], "alex.test@exemple.be")             # l'adresse du CV, jamais le cabinet
+            self.assertIn("[TEST n°", str(email.header.make_header(email.header.decode_header(m["Subject"]))))
+            self.assertEqual(len([p for p in m.walk() if p.get_filename()]), 2)   # CV + lettre
         orchestrateur.pipeline()                                           # 2e passage : aucun doublon
         self.assertEqual(db.q1("SELECT COUNT(*) AS n FROM offres")["n"], 5)
 
     def test_3_repetition_puis_vrai(self):
-        concierge.recevoir(Entrant(texte="ok"))
-        lumen, delta, horizon = offre("Cabinet Lumen Avocats"), offre("Delta & Associés"), offre("Cabinet Horizon Immo")
-        self.assertEqual(lumen["statut"], "repetee")
-        self.assertEqual(horizon["statut"], "repetee")
-        self.assertEqual(delta["statut"], "manuelle")                     # formulaire : lien + lettre
-        sortis = emails_sortis()
-        self.assertEqual(len(sortis), 2)
-        for f in sortis:
-            import email
-            m = email.message_from_bytes(f.read_bytes())
-            self.assertEqual(m["To"], "moi@exemple.be")                    # vers MOI, pas le cabinet
-            self.assertIn("RÉPÉTITION", str(email.header.make_header(email.header.decode_header(m["Subject"]))))
+        lumen, delta = offre("Cabinet Lumen Avocats"), offre("Delta & Associés")
         concierge.recevoir(Entrant(texte=f"vrai {lumen['id']}"))          # « L'envoyer pour de vrai »
         self.assertEqual(offre("Cabinet Lumen Avocats")["statut"], "envoyee")
         self.assertTrue(offre("Cabinet Lumen Avocats")["message_id"])
@@ -169,10 +171,35 @@ class Circuit(unittest.TestCase):
 
     def test_7_test_en_langage_naturel(self):
         concierge.recevoir(Entrant(texte="j'aimerais d'abord essayer pour voir si ça marche"))
-        self.assertIn("Test terminé", self.canal.messages[-1])
+        self.assertTrue(any("Test terminé" in m for m in self.canal.messages[-3:]))
         self.assertTrue(any(f.name == "banc_essai.md" for f in self.canal.fichiers))
         concierge.recevoir(Entrant(texte="aide"))
         self.assertIn("teste-toi", self.dernier())
+
+    def test_7b_manager(self):
+        """Le Manager AGIT : chercher maintenant, envoyer à une adresse, régler, envoyer ici, pause datée."""
+        appels = []
+        orchestrateur.declencher = lambda: appels.append("recherche")
+        concierge.recevoir(Entrant(texte="lance une recherche maintenant stp"))
+        self.assertEqual(appels, ["recherche"])
+        self.assertIn("lancé", self.dernier())
+        avant = len(emails_sortis())
+        with db.tx() as c:                                       # une candidature testée récente
+            c.execute("UPDATE offres SET statut='repetee', envoye_le=datetime('now') WHERE entreprise='Cabinet Horizon Immo'")
+        concierge.recevoir(Entrant(texte="envoie-les sur mon autre mail alex.perso@exemple.com"))
+        nouveaux = emails_sortis()[avant:]
+        self.assertGreaterEqual(len(nouveaux), 1)
+        self.assertIn(b"To: alex.perso@exemple.com", nouveaux[0].read_bytes())
+        concierge.recevoir(Entrant(texte="mets le score minimum à 6"))
+        self.assertEqual(config.regles_envoi()["score_minimum"], 6)
+        n = len(self.canal.fichiers)
+        concierge.recevoir(Entrant(texte="envoie ici la lettre"))
+        self.assertGreater(len(self.canal.fichiers), n)
+        concierge.recevoir(Entrant(texte="j'ai mes examens, pause"))
+        self.assertEqual(db.kv_get("pause_jusqu"), "2099-06-20")
+        db.kv_set("pause_jusqu", "2000-01-01")                   # date passée → reprise toute seule
+        self.assertFalse(orchestrateur.en_pause())
+        orchestrateur.declencher = lambda: None
 
     def test_8_banc_essai(self):
         rapport = essai.banc_essai()
@@ -251,15 +278,21 @@ class AnnoncePrecise(unittest.TestCase):
 
 class Garde(unittest.TestCase):
     def test_synonymes_et_langues(self):
-        dom = {"matieres_exclues": ["droit pénal"], "langues": ["français"], "matieres_uniquement": []}
+        dom = {"secteurs_exclus": ["droit pénal"], "langues": ["français"], "secteurs_uniquement": []}
         regles = config.regles_envoi()
         v = lambda **o: garde.verdict({"id": 0, **o}, dom, regles)  # noqa: E731
         self.assertIsNotNone(v(titre="Juriste – contentieux correctionnel"))
         self.assertIsNotNone(v(titre="Juriste", langue="néerlandais courant"))
         self.assertIsNone(v(titre="Juriste immobilier", langue="français"))
-        dom["matieres_uniquement"] = ["droit immobilier"]
-        self.assertIsNotNone(v(titre="Juriste", matiere="droit fiscal"))
-        self.assertIsNone(v(titre="Juriste", matiere="baux commerciaux et copropriété"))
+        self.assertIsNone(v(titre="Juriste", description="Cabinet actif en droit pénal, civil et immobilier"))
+        self.assertIsNotNone(v(titre="Juriste", langue="français + néerlandais"))
+        from datetime import date
+        an = date.today().year
+        self.assertIn("trop ancienne", v(titre="Juriste", publie_le=f"{an - 3}-05-02") or "")
+        self.assertIn("date limite", v(titre="Juriste", date_limite=f"{an - 1}-01-01") or "")
+        dom["secteurs_uniquement"] = ["droit immobilier"]
+        self.assertIsNotNone(v(titre="Juriste", secteur="droit fiscal"))
+        self.assertIsNone(v(titre="Juriste", secteur="baux commerciaux et copropriété"))
 
 
 class Outils(unittest.TestCase):
@@ -287,6 +320,56 @@ class Outils(unittest.TestCase):
 
     def test_banc_valide(self):
         self.assertEqual(len(json.loads(essai.BANC.read_text(encoding="utf-8"))), 5)
+
+
+class ZRobustesse(unittest.TestCase):
+    """Ce qui fait qu'un agent « ne fait rien » doit être dit clairement, une seule fois."""
+
+    def setUp(self):
+        self.canal = CanalTest()
+        messagerie.brancher(self.canal)
+
+    def test_ia_indisponible_bloque_sans_insister(self):
+        from agent_avocat import llm
+        db.kv_set("ia_bloquee_jusqu", None)
+        with self.assertRaises(llm.IAIndisponible):
+            llm._bloquer("crédit Anthropic épuisé")
+        with self.assertRaises(llm.BudgetDepasse):          # les agents l'attrapent comme un budget atteint
+            llm._verifier_disponible()
+        db.kv_set("ia_bloquee_jusqu", 0)
+        llm._verifier_disponible()                          # délai passé : on réessaie
+
+    def test_alerte_une_seule_fois(self):
+        from agent_avocat import llm
+        llm._alerte("essai_unique", "Ton crédit Claude est épuisé")
+        llm._alerte("essai_unique", "Ton crédit Claude est épuisé")
+        self.assertEqual(sum("crédit" in m for m in self.canal.messages), 1)
+
+    def test_budget_reglable(self):
+        concierge.recevoir(Entrant(texte="budget 5"))
+        self.assertEqual(config.env("BUDGET_JOUR_EUR"), "5")
+        self.assertIn("5 €", self.canal.messages[-1])
+
+    def test_diagnostic(self):
+        from agent_avocat.agents import diagnostic
+        texte = diagnostic.rapport(envoyer=False)
+        self.assertIn("SIMULATION", texte)
+        db.kv_set("pause", True)
+        self.assertIn("PAUSE", diagnostic.rapport(envoyer=False))
+        db.kv_set("pause", False)
+
+    def test_rappel_via_site_une_fois_par_jour(self):
+        from agent_avocat.agents import rapporteur
+        o = config.objectif()
+        o.setdefault("envoi", {})["mode"] = "validation"
+        config.sauver_objectif(o)
+        with db.tx() as c:
+            c.execute("INSERT OR IGNORE INTO offres (cle, url, titre, entreprise, statut) VALUES "
+                      "('rappel1', 'https://exemple.be/offre/1', 'Poste', 'Employeur Rappel', 'manuelle')")
+        db.kv_set("dernier_rappel_site", None)
+        rapporteur.rappel_via_site(heure=10)
+        rapporteur.rappel_via_site(heure=10)                     # 2e fois le même jour : rien
+        self.assertEqual(sum("Employeur Rappel" in m for m in self.canal.messages), 1)
 
 
 if __name__ == "__main__":

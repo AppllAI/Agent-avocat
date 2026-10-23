@@ -1,4 +1,4 @@
-"""Agent Essayeur — pour tester la qualité AVANT de laisser l'agent écrire aux cabinets.
+"""Agent Essayeur — pour tester la qualité AVANT de laisser l'agent écrire aux employeurs.
 
   • « essai <lien d'une offre> » sur Telegram : toute la chaîne sur CETTE offre (lecture, règles, note,
     enquête, lettre, Juge) et il te montre le résultat. Rien n'est envoyé. Un bouton permet ensuite de l'ajouter.
@@ -45,6 +45,8 @@ def analyser(o: dict) -> dict:
     champs = {k: o.get(k) for k in evaluateur.CHAMPS}
     n = llm.demander("evaluateur", "rapide", systeme, json.dumps([champs], ensure_ascii=False, default=str),
                      evaluateur.SCHEMA, max_tokens=600)["notes"][0]
+    if n.get("regle_violee") and not n.get("regle"):      # « violation » sans règle précise : on ne la retient pas
+        n["regle_violee"] = False
     rapport["evaluation"] = n
     o["score"], o["pourquoi"] = n["score"], json.dumps(n.get("pourquoi") or [], ensure_ascii=False)
     if rapport["garde"] or n.get("regle_violee") or (n.get("score") or 0) < regles["score_minimum"]:
@@ -85,7 +87,7 @@ def texte_rapport(r: dict) -> str:
 
 
 def essayer(url: str):
-    messagerie.dire("⏳ J'analyse cette offre (lecture, règles, note, enquête, lettre, Juge)… ~1 minute.")
+    messagerie.dire("J'analyse cette offre (lecture, règles, note, enquête, lettre, Juge)… ~1 minute.")
     try:
         r = analyser(_lire_offre(url))
     except Exception as e:
@@ -99,13 +101,13 @@ def essayer(url: str):
     if not r["garde"] and not r["evaluation"]["regle_violee"]:
         with db.tx() as cx:
             cur = cx.execute(
-                """INSERT OR IGNORE INTO offres (cle, url, source, titre, entreprise, ville, matiere, contrat, langue,
-                   description, email_contact, mode_candidature, score, raison, pourquoi, infos_cabinet, lettre,
+                """INSERT OR IGNORE INTO offres (cle, url, source, titre, entreprise, ville, secteur, contrat, langue,
+                   horaires, salaire_horaire, description, email_contact, mode_candidature, score, raison, pourquoi, infos_cabinet, lettre,
                    objet_mail, corps_mail, note_lettre, statut, notifie)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'a_valider',1)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'a_valider',1)""",
                 (outils.cle_offre(o["url"], o.get("entreprise"), o.get("titre")), o["url"], "essai", o.get("titre"),
-                 o.get("entreprise"), o.get("ville"), o.get("matiere"), o.get("contrat"), o.get("langue"),
-                 o.get("description"), o.get("email_contact"), "email" if o.get("email_contact") else "formulaire",
+                 o.get("entreprise"), o.get("ville"), o.get("secteur"), o.get("contrat"), o.get("langue"),
+                 o.get("horaires"), o.get("salaire_horaire"), o.get("description"), o.get("email_contact"), "email" if o.get("email_contact") else "formulaire",
                  o.get("score"), r["evaluation"]["raison"], o.get("pourquoi"), o.get("infos_cabinet"),
                  c["lettre"], c["objet"], c["email"], c["note"]))
             oid = cur.lastrowid if cur.rowcount else None

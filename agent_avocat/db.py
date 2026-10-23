@@ -38,9 +38,11 @@ TRANSITIONS = {
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS offres (
     id INTEGER PRIMARY KEY,
-    cle TEXT UNIQUE,                 -- empreinte anti-doublon (url normalisée / cabinet+titre)
+    cle TEXT UNIQUE,                 -- empreinte anti-doublon (url normalisée / employeur+titre)
     url TEXT, source TEXT,
-    titre TEXT, entreprise TEXT, ville TEXT, matiere TEXT, contrat TEXT, langue TEXT,
+    titre TEXT, entreprise TEXT, ville TEXT, secteur TEXT, contrat TEXT, langue TEXT,
+    horaires TEXT, salaire_horaire REAL,     -- si l'annonce les donne (temps partiel, rémunération)
+    date_limite TEXT,                         -- date limite de candidature, si l'annonce en donne une
     description TEXT,
     email_contact TEXT, mode_candidature TEXT,   -- email | formulaire | inconnu
     score INTEGER, raison TEXT,
@@ -106,7 +108,11 @@ def connexion() -> sqlite3.Connection:
 def _migrer(c):
     """Ajoute les colonnes des nouvelles versions à une base existante (sans rien perdre)."""
     existantes = {r[1] for r in c.execute("PRAGMA table_info(offres)")}
-    for col in ("publie_le TEXT", "pourquoi TEXT", "note_lettre INTEGER"):
+    if "matiere" in existantes and "secteur" not in existantes:     # v0.3 → v0.4 : même info, nom commun aux métiers
+        c.execute("ALTER TABLE offres RENAME COLUMN matiere TO secteur")
+        existantes = (existantes - {"matiere"}) | {"secteur"}
+    for col in ("publie_le TEXT", "pourquoi TEXT", "note_lettre INTEGER", "horaires TEXT", "salaire_horaire REAL",
+                "date_limite TEXT"):
         if col.split()[0] not in existantes:
             c.execute(f"ALTER TABLE offres ADD COLUMN {col}")
     c.commit()

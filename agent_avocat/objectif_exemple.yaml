@@ -1,31 +1,33 @@
 # Ton objectif. Le Coach le remplit avec toi sur Telegram, mais tu peux aussi l'éditer à la main.
 # Les règles "uniquement" / "exclues" sont STRICTES : une offre qui les viole n'est jamais postulée.
 
+version: 2
 domaine_actif: droit_belge
 
 domaines:
   droit_belge:
     description: ""
     postes_vises: [stagiaire avocat, juriste, collaborateur, paralegal]
-    matieres_uniquement: []          # ex. [droit immobilier] → SEULEMENT ça
-    matieres_exclues: [droit pénal]  # ex. jamais de pénal
+    secteurs_uniquement: []          # matières du droit : ex. [droit immobilier] → SEULEMENT ça
+    secteurs_exclus: [droit pénal]   # ex. jamais de pénal
     villes: [Bruxelles]
     teletravail_ok: true
     langues: [français]
     contrats: [CDI, CDD, stage]
     exclure_entreprises: []
-    disponibilite: ""
+    disponibilites: ""               # ex. « dès septembre 2027 », « temps plein », « 4/5 »
     mots_cles_recherche:
       - juriste Bruxelles
       - stage avocat Bruxelles
       - collaborateur avocat Bruxelles
       - paralegal Bruxelles
-    # Pages que tu veux surveiller en plus (flux RSS ou pages carrières de cabinets)
+    # Pages de listes d'offres (sans IA, gratuit) et pages carrières / flux RSS de cabinets
+    listes_a_surveiller: []
     pages_a_surveiller: []
 
 envoi:
-  # repetition = TEST : tout est réel (recherche, lettres, PDF) mais les emails partent vers TA boîte,
-  #              jamais vers les cabinets. Tu vois exactement ce qui serait parti.
+  # repetition = TEST : l'agent fait TOUT seul (recherche, lettres, PDF) et chaque candidature part vers
+  #              l'adresse email de ton CV, jamais vers les cabinets. Rien sur ta messagerie.
   # validation = réel, tu valides chaque candidature d'un bouton sur Telegram.
   # auto       = réel, envoi direct des candidatures que le Juge a notées ≥ 8/10.
   mode: repetition

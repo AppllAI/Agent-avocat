@@ -5,7 +5,18 @@
 import platform
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+
+# JobSpy (Indeed + Google Jobs) et sa bibliothèque réseau (fichiers natifs) : tout embarquer
+extra_datas, extra_bins, extra_imports = [], [], []
+for paquet in ("jobspy", "tls_client"):
+    try:
+        d, b, h = collect_all(paquet)
+        extra_datas += d
+        extra_bins += b
+        extra_imports += h
+    except Exception:
+        pass
 
 WINDOWS = platform.system() == "Windows"
 pont = Path("build/pont") / ("pont-whatsapp.exe" if WINDOWS else "pont-whatsapp")
@@ -15,9 +26,10 @@ a = Analysis(
     datas=[("agent_avocat/prompts", "agent_avocat/prompts"),
            ("agent_avocat/objectif_exemple.yaml", "agent_avocat"),
            ("agent_avocat/banc_essai.json", "agent_avocat"),
-           ("assets/icone_256.png", "assets")] + collect_data_files("tzdata"),
-    binaries=[(str(pont), "pont")] if pont.exists() else [],
-    hiddenimports=collect_submodules("agent_avocat") + collect_submodules("anthropic") + ["qrcode", "pypdf", "fpdf", "tzdata"],
+           ("assets/icone_256.png", "assets")] + collect_data_files("tzdata") + extra_datas,
+    binaries=([(str(pont), "pont")] if pont.exists() else []) + extra_bins,
+    hiddenimports=collect_submodules("agent_avocat") + collect_submodules("anthropic") + extra_imports
+                  + ["qrcode", "pypdf", "fpdf", "tzdata"],
     excludes=["pytest", "numpy.tests"],
 )
 pyz = PYZ(a.pure)
@@ -30,5 +42,5 @@ else:
     coll = COLLECT(exe, a.binaries, a.datas, name="AgentAvocat", upx=False)
     app = BUNDLE(coll, name="Agent Avocat.app", icon="assets/icone_1024.png",
                  bundle_identifier="be.agentavocat.app",
-                 info_plist={"NSHighResolutionCapable": True, "CFBundleShortVersionString": "0.3.0",
+                 info_plist={"NSHighResolutionCapable": True, "CFBundleShortVersionString": "0.4.0",
                              "LSApplicationCategoryType": "public.app-category.productivity"})

@@ -9,8 +9,27 @@ from pathlib import Path
 
 from . import config, db
 
+import threading
+
 _canal = None
 Boutons = list[list[tuple[str, str]]]
+_local = threading.local()       # capture des messages par le Manager (fil courant uniquement)
+
+
+class capturer:
+    """Pendant un outil du Manager : les messages des autres agents sont RÉCUPÉRÉS au lieu d'être envoyés,
+    pour que le Manager réponde une seule fois, court et clair. Les fichiers, eux, partent normalement."""
+    def __enter__(self):
+        self.textes = []
+        _local.capture = self.textes
+        return self
+
+    def __exit__(self, *a):
+        _local.capture = None
+
+    @property
+    def texte(self):
+        return "\n".join(self.textes)
 
 
 def brancher(canal):
@@ -19,15 +38,40 @@ def brancher(canal):
 
 
 def _prefixe(texte: str) -> str:
-    """En mode répétition, chaque message le rappelle : impossible de confondre avec le vrai."""
+    """(Ancien préfixe 🧪 du mode test : retiré, le mode est rappelé seulement quand c'est utile.)"""
     try:
         mode = config.regles_envoi()["mode"]
     except Exception:
         mode = ""
-    return f"🧪 {texte}" if mode == "repetition" and not texte.startswith("🧪") else texte
+    return texte                      # le mode test est rappelé quand c'est utile, pas sur chaque message
+
+
+def en_test() -> bool:
+    try:
+        return config.regles_envoi()["mode"] == "repetition"
+    except Exception:
+        return False
+
+
+def signaler(texte: str, boutons: Boutons | None = None):
+    """Notification du travail de fond. En mode TEST : rien sur ta messagerie (tout arrive par email),
+    seulement une ligne dans le journal de l'application."""
+    if en_test():
+        db.journal("agent", texte.replace("\n", " ")[:160])
+        return
+    dire(texte, boutons)
+
+
+def signaler_fichier(chemin, legende=""):
+    if not en_test():
+        fichier(chemin, legende)
 
 
 def dire(texte: str, boutons: Boutons | None = None):
+    capture = getattr(_local, "capture", None)
+    if capture is not None:
+        capture.append(texte + (" " + texte_boutons(boutons) if boutons else ""))
+        return
     texte = _prefixe(texte)
     db.dire("agent", texte)
     if _canal:

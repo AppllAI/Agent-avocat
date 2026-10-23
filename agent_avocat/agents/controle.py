@@ -11,6 +11,8 @@ from .redacteur import chemin_lettre
 
 TROUS = re.compile(r"\[[^\]]{0,40}\]|\bX{3,}\b|<[^>@\s]{2,30}>|\{\w+\}|\bTODO\b|nom du cabinet|nom de l'employeur", re.I)
 MOTS_VIDES = {"cabinet", "avocats", "avocat", "associes", "associés", "law", "firm", "scrl", "srl", "sprl", "bv",
+              "shop", "store", "magasin", "boutique", "brasserie", "restaurant", "group", "groupe", "belgium", "belgique", "brussels",
+              "bruxelles", "services", "service", "company", "nv", "asbl", "vzw", "interim", "jobs", "students",
               "the", "les", "des", "and", "partners", "legal", "advocaten"}
 
 
@@ -100,6 +102,8 @@ def problemes(o) -> list[str]:
         p.append("adresse du destinataire invalide")
     if not config.chemin_cv().exists():
         p.append("CV manquant")
+    if (o.get("date_limite") or "9999") < __import__("datetime").date.today().isoformat():
+        p.append(f"la date limite ({o['date_limite']}) est passée")
     if not chemin_lettre(o["id"]).exists():
         p.append("PDF de la lettre manquant")
     nom = (config.env("NOM_CANDIDAT") or "").strip()

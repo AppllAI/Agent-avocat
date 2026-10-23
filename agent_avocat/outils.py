@@ -12,11 +12,18 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"
 _PISTEURS = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "from", "src", "trk"}
 RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_EMAILS_IGNORES = ("noreply", "no-reply", "privacy", "gdpr", "dpo@", "webmaster", "example.", "sentry", "wixpress")
+_EMAILS_IGNORES = ("noreply", "no-reply", "privacy", "gdpr", "dpo@", "webmaster", "example.", "sentry", "wixpress",
+                   "helpdesk", "support@", "facturation", "billing", "invoice", "comptabilite", "accounting",
+                   "press@", "presse@", "marketing@", "unsubscribe", "abuse@")
+# Adresses faites pour recevoir des candidatures
+RE_EMAIL_RECRUTEMENT = re.compile(r"^(jobs?|emplois?|recrutements?|recruit\w*|careers?|carrieres?|rh|hr|vacatures?|"
+                                  r"solliciteren|sollicitatie|personeel|talent|candidatures?|werken|work|staffing)"
+                                  r"[.@_-]", re.I)
 # Adresses des SITES d'emploi eux-mêmes : y envoyer une candidature serait une bourde (ce n'est pas l'employeur)
 SITES_EMPLOI = ("lexgo.", "jobat.", "stepstone.", "indeed.", "legalworld.", "references.be", "actiris.", "leforem.",
                 "vdab.", "linkedin.", "glassdoor.", "monster.", "talent.com", "jobted.", "optioncarriere.", "jooble.",
-                "kapitalis.", "jobsinbrussels.", "ictjob.", "justifit.")
+                "kapitalis.", "jobsinbrussels.", "ictjob.", "justifit.", "student.be", "studentjob.", "stujobs.",
+                "jobteaser.")   # les agences d'intérim (Randstad, Adecco…) restent permises : ce sont des recruteurs
 
 
 def sans_accents(s: str) -> str:
@@ -97,6 +104,8 @@ def _jp(d: dict) -> dict:
         "contrat": ", ".join(contrat) if isinstance(contrat, list) else contrat,
         "description": texte_html(d.get("description") or "", 4000),
         "date": d.get("datePosted"),
+        "publie_le": str(d.get("datePosted") or "")[:10] or None,
+        "date_limite": str(d.get("validThrough") or "")[:10] or None,
         "teletravail": d.get("jobLocationType") == "TELECOMMUTE",
     }
 

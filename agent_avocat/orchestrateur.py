@@ -1,6 +1,6 @@
 """Le chef d'orchestre : du code simple, pas une IA (gratuit, et il ne se trompe jamais de chemin).
 
-  Toutes les 15 min  : Veille gratuite (LexGO, Indeed, pages suivies) → s'il y a du neuf, traitement immédiat
+  Toutes les 15 min  : Veille gratuite (LexGO, Indeed, Google Jobs, listes et pages suivies) → s'il y a du neuf, traitement immédiat
   Toutes les heures  : Éclaireur web (7h-22h), 2 requêtes en parallèle → traitement
   Chaque matin       : Prospecteur (candidatures spontanées) → traitement
   Traitement         : Extracteur → Garde → Évaluateur → Enquêteur → Rédacteur ⇄ Juge → cartes sur Telegram
@@ -34,7 +34,16 @@ def _proteger(nom, f, *a):
 
 
 def en_pause() -> bool:
-    return bool(db.kv_get("pause", False))
+    if not db.kv_get("pause", False):
+        return False
+    fin = db.kv_get("pause_jusqu")
+    if fin and datetime.now().date().isoformat() >= fin:      # fin du blocus / des vacances : on reprend seul
+        db.kv_set("pause", False)
+        db.kv_set("pause_jusqu", None)
+        messagerie.dire("Fin de ta pause : je reprends la recherche et les candidatures. Bonne reprise !")
+        declencher()
+        return False
+    return True
 
 
 def pret() -> bool:
@@ -59,9 +68,12 @@ def en_fond(f, *a):
         try:
             f(*a)
         except Exception as e:
+            from . import llm
             db.journal("orchestre", f"{getattr(f, '__name__', 'tâche')} a échoué : {type(e).__name__}: {e}")
-            messagerie.dire(f"⚠️ Oups, ça a planté de mon côté ({type(e).__name__}). "
-                            "Envoie une capture de « Ce que font les agents » au développeur.")
+            if isinstance(e, llm.BudgetDepasse):     # budget / crédit : déjà annoncé une fois, clairement
+                return
+            messagerie.dire(f"⚠️ Ça a coincé de mon côté ({type(e).__name__} : {str(e)[:120]}). "
+                            "Écris « diagnostic » pour que je vérifie tout.")
     threading.Thread(target=tache, daemon=True).start()
 
 
@@ -84,8 +96,11 @@ def traitement():
 def veille():
     if en_pause() or not pret():
         return
+    db.journal("eclaireur", "recherche en cours (LexGO, Indeed, Google Jobs, pages suivies)…")
     nouvelles = _proteger("veille", sources.veille_gratuite) or 0
     en_attente = db.q1("SELECT COUNT(*) AS n FROM offres WHERE statut IN ('decouverte','enrichie','qualifiee')")["n"]
+    db.journal("eclaireur", f"recherche finie : {nouvelles} nouvelle(s) offre(s) · {en_attente} en traitement"
+                            f" · prochaine dans {config.env_int('INTERVALLE_VEILLE_MIN', 15)} min")
     if nouvelles or en_attente:
         traitement()
 
@@ -129,6 +144,7 @@ def horaire():
     if en_pause():
         return
     _proteger("relance", relance.relancer)
+    _proteger("rappel", rapporteur.rappel_via_site)
     if datetime.now().hour >= 19:
         _proteger("bilan", rapporteur.bilan_du_jour)
 
@@ -169,6 +185,12 @@ def demarrer(canal):
     db.connexion()
     coach.appliquer_identite()
     messagerie.brancher(canal)
+    if not db.kv_get("regles_v2_appliquees"):
+        # Nouvelles règles (langues « atout » ≠ « exigée », note minimum 5) : on redonne leur chance
+        # aux offres récentes écartées par les anciennes règles.
+        db.kv_set("regles_v2_appliquees", True)
+        n = _proteger("evaluateur", evaluateur.reevaluer_recentes, 21, True) or 0
+        db.journal("evaluateur", f"nouvelles règles : {n} offre(s) écartée(s) récemment sont réévaluées")
     file: queue.Queue = queue.Queue()
 
     def ouvrier():
@@ -180,7 +202,7 @@ def demarrer(canal):
     threading.Thread(target=ouvrier, daemon=True).start()
     rythme = config.env_int
     for f, minutes, decalage in ((veille, rythme("INTERVALLE_VEILLE_MIN", 15), 5),
-                                 (recherche_web, rythme("INTERVALLE_WEB_MIN", 360), 60),
+                                 (recherche_web, rythme("INTERVALLE_WEB_MIN", 720), 60),
                                  (prospection, 60, 120),
                                  (_envoyer, 10, 30),
                                  (boite, rythme("INTERVALLE_BOITE_MIN", 5), 10),
@@ -192,5 +214,12 @@ def demarrer(canal):
         coach.bienvenue()
     db.journal("orchestre", f"démarré · canal {canal.nom} · mode {config.regles_envoi()['mode']}"
                             f"{' · SIMULATION' if config.simulation() else ''}")
+    if not config.simulation():
+        from .agents import diagnostic
+        en_fond(diagnostic.au_demarrage)
+    if en_pause():
+        db.journal("orchestre", "⏸️ EN PAUSE : aucune recherche ni envoi tant que tu n'écris pas « reprendre »")
+        messagerie.dire("Je suis en pause : je ne cherche et n'envoie rien. Écris « reprendre » pour que je m'y remette.",
+                        [[("▶️ Reprendre", "reprendre")]])
     canal.ecouter(file.put)   # bloquant
     file.join()               # fin de session : on finit de traiter les messages reçus

@@ -21,7 +21,7 @@ def preparer():
             continue
         if r["id"] in faits or not (maintenant < debut <= maintenant + timedelta(hours=30)):
             continue
-        o = db.q1("SELECT titre, entreprise, ville, matiere, description, lettre FROM offres WHERE id=?", r["offre_id"])
+        o = db.q1("SELECT titre, entreprise, ville, secteur, description, lettre FROM offres WHERE id=?", r["offre_id"])
         contenu = json.dumps({"rdv": {"employeur": r["entreprise"], "quand": joli(r["debut"]), "lieu": r["lieu"]},
                               "offre": dict(o) if o else None}, ensure_ascii=False)
         try:
