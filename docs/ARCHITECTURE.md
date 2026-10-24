@@ -50,6 +50,34 @@ demande et la réalise avec ses outils (chercher, envoyer ici ou par email, rég
 **23 agents**, dont 9 sans IA. L'IA rapide (Haiku) trie, note et comprend tes messages ;
 l'IA qualité (Sonnet) écrit et juge ce que les recruteurs liront, et prépare tes entretiens.
 
+## Pièces jointes : toujours des PDF
+
+Rien n'est collé dans le corps d'un email. L'email reste court (ce qu'un recruteur lit en 10 secondes) et tout le
+reste voyage en **PDF joint** (`agent_avocat/pdf.py`) :
+
+| Email | Pièces jointes |
+|---|---|
+| Candidature | `CV_Prenom_Nom.pdf` + `Lettre_de_motivation_Prenom_Nom.pdf` (mise en page belge, une page) |
+| Mode test | les mêmes + `Rapport_test_12_Prenom_Nom.pdf` (offre, adéquation, avis du Juge) |
+| Relance (J+8) | CV + lettre à nouveau, dans le même fil |
+| Sur ta messagerie | lettre, fiche d'entretien, rapport du banc d'essai : en PDF |
+
+Le Rédacteur rend la lettre en **blocs** (expéditeur, destinataire, lieu et date, objet, paragraphes, politesse,
+signature) : le code la met en page lui-même, elle est donc toujours propre. Sans `fpdf2`, un petit générateur
+intégré produit quand même un PDF.
+
+## Les bonnes infos sur les bons sites
+
+- **Offres** : LexGO (API officielle) + Indeed + Google Jobs gratuitement ; la recherche web (payante) ne perd
+  jamais une recherche sur ces sites déjà lus, ni sur LinkedIn, Glassdoor et les agrégateurs qui recopient les
+  annonces. Elle vise Legalworld, Jobat, StepStone, les barreaux et les pages carrières des cabinets.
+- **Annonce retirée** (page 404) : écartée tout de suite, sans IA.
+- **Faits sur l'employeur** : quand on connaît son site (email pro, annonce publiée chez lui), le code lit
+  gratuitement l'accueil et les pages contact / carrières, et l'IA rapide en tire 2-3 faits **sans recherche web**
+  (≈ 5 s, presque gratuit, source officielle). Sinon : recherche web limitée à son site, ou hors sites d'emploi.
+- **Adresses email** : jamais devinées. Le code vérifie chacune : lue sur une page du site, ou du domaine officiel ;
+  une adresse inventée est remplacée par celle que le site publie vraiment (jobs@, rh@…), ou abandonnée.
+
 ## Zéro invention : 4 filets de sécurité
 
 1. **Rédacteur** (Sonnet, avec réflexion) : consigne stricte — uniquement les faits du profil, accords au genre
@@ -68,10 +96,11 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
 | Étape | Coût |
 |---|---|
 | Lecture du CV (une fois) | ~0,02 € |
-| Note de 8 offres | ~0,002 € |
+| Note de 8 offres | < 0,001 € (Haiku 5.5) |
 | Lettre + Juge | ~0,04 € (0,07 € si une réécriture) |
 | Offre écartée par tes règles | 0 € |
-| Recherche web | ~0,10 € (2-3 fois/jour) |
+| Recherche web | ~0,03 € par requête (≈ 0,01 € par recherche) |
+| Faits sur un employeur (site officiel lu par le code) | < 0,001 € |
 | LexGO / Indeed / Google Jobs | 0 € |
 
 ## Ce qui se passe quand tu lances l'application
@@ -93,7 +122,7 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
 
 ## La phase de test (avant d'écrire au moindre cabinet)
 
-1. **Banc d'essai** — `python -m agent_avocat --banc-essai` : 5 offres types → `donnees/banc_essai.md`
+1. **Banc d'essai** — `python -m agent_avocat --banc-essai` : 5 offres types → `donnees/banc_essai.md` (+ `.pdf`)
    avec chaque lettre, sa note et les remarques du Juge. Coût ≈ 0,20 €. Tu juges la qualité à froid.
 2. **Essai d'une vraie offre** — sur Telegram : `essai https://…` → toute la chaîne sur cette offre,
    résultat et lettre PDF, **rien n'est envoyé**.
@@ -104,8 +133,8 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
 4. **Mode validation** — `mode validation` : réel, rien ne part sans ton ✅.
 5. **Mode auto** — `mode auto` : il envoie seul les lettres notées ≥ 7/10 par le Juge (réglable).
 
-Tes remarques (« trop long », « parle de mon Erasmus ») vont dans `profil/style.md` et s'appliquent à toutes
-les lettres suivantes ; les lettres que tu valides servent de modèle de ton.
+Pas de mémoire pour l'instant : l'agent n'apprend pas tes préférences de style d'une lettre à l'autre
+(chaque lettre part du profil, de l'offre et des faits sur l'employeur). Ce sera ajouté plus tard.
 
 ## Budget
 
@@ -116,3 +145,14 @@ jusqu'au lendemain. `stats` affiche la dépense.
 ## Tester le code
 
 `python -m unittest discover tests -v` fait tourner tout le circuit en simulation (sans IA ni email réels).
+
+## Un socle pour tous les métiers
+
+Ces deux agents (Avocat, Student) partagent le même moteur. Pour un nouveau métier, seuls changent :
+
+| Propre au métier | Commun (à ne pas dupliquer) |
+|---|---|
+| `prompts/*.md` (vocabulaire, sites, usages) | `llm.py` (IA, budget, recherche web ciblée) |
+| `agents/sources.py` : sources gratuites du métier | `db.py` (machine à états), `orchestrateur.py` |
+| `agents/garde.py` : synonymes des secteurs | `pdf.py`, `envoyeur.py`, `relance.py`, `trieur.py`, `secretaire.py` |
+| `objectif_exemple.yaml`, `banc_essai.json`, `simulation.py` | `outils.py` (site officiel, vérification des emails) |

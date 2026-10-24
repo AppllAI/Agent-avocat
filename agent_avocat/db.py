@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS offres (
     message_id TEXT,                 -- Message-ID de notre email (pour relier les réponses)
     publie_le TEXT,                  -- date de publication (fraîcheur = chances d'entretien)
     pourquoi TEXT,                   -- les 2-3 arguments « pourquoi toi » trouvés par l'Évaluateur
-    note_lettre INTEGER              -- note du Juge /10
+    note_lettre INTEGER,             -- note du Juge /10
+    lettre_json TEXT                 -- la lettre en blocs (expéditeur, destinataire, paragraphes…) pour le PDF
 );
 CREATE INDEX IF NOT EXISTS ix_offres_statut ON offres(statut);
 
@@ -112,7 +113,7 @@ def _migrer(c):
         c.execute("ALTER TABLE offres RENAME COLUMN matiere TO secteur")
         existantes = (existantes - {"matiere"}) | {"secteur"}
     for col in ("publie_le TEXT", "pourquoi TEXT", "note_lettre INTEGER", "horaires TEXT", "salaire_horaire REAL",
-                "date_limite TEXT"):
+                "date_limite TEXT", "lettre_json TEXT"):
         if col.split()[0] not in existantes:
             c.execute(f"ALTER TABLE offres ADD COLUMN {col}")
     c.commit()

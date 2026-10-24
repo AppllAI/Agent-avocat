@@ -26,8 +26,6 @@ Déroulé :
 - `objectif_maj` : uniquement les champs nouveaux ou modifiés par CE message.
 - Si le profil n'a pas de ligne « Accords », demande une fois, simplement : « Pour tes lettres, j'écris au
   masculin ou au féminin ? ». Sa réponse sera ajoutée au profil automatiquement.
-- Si elle exprime une préférence de STYLE pour ses lettres (ton, longueur, ce qu'il faut mettre en avant),
-  reprends-la dans `reponse` et indique qu'elle pourra la redire à tout moment.
 - Le récap final rappelle qu'on démarre en mode test : chaque candidature (lettre + CV) arrive sur l'email de son
   CV, rien ne part chez les cabinets, et l'agent reste silencieux ici.
 - Ton : sobre, pas d'emojis sauf pour une vraie bonne nouvelle.

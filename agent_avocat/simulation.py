@@ -51,9 +51,13 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
         o = d["offre"]
         corps = ("Mon parcours m'a permis de travailler des dossiers concrets, de rédiger des notes de synthèse "
                  "et de suivre des audiences, ce qui correspond aux missions décrites dans votre annonce. ") * 6
-        return {"lettre": f"Bruxelles, le {d['date_du_jour']}\n\nMadame, Monsieur,\n\nVotre offre de {o['poste']} "
-                          f"chez {o['employeur']} a retenu toute mon attention.\n\n{corps}\n\nJe vous prie d'agréer, "
-                          "Madame, Monsieur, l'expression de mes salutations distinguées.\n\nAlex Test",
+        return {"expediteur": ["Alex Test", "Bruxelles", "alex.test@exemple.be"],
+                "destinataire": [o["employeur"]], "lieu_date": f"Bruxelles, le {d['date_du_jour']}",
+                "objet_lettre": f"Candidature – {o['poste']}", "appel": "Madame, Monsieur,",
+                "paragraphes": [f"Votre offre de {o['poste']} chez {o['employeur']} a retenu toute mon attention.",
+                                corps.strip()],
+                "politesse": "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.",
+                "signature": "Alex Test",
                 "objet": f"Candidature – {o['poste']}",
                 "email": "Madame, Monsieur,\n\nVeuillez trouver ci-joint mon CV et ma lettre de motivation.\n\nBien à vous"}
     if agent == "juge":
@@ -87,8 +91,6 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
             return {"action": "pause", "jusqu_au": "2099-06-20", "reponse": "Bon courage pour les examens."}
         if "essayer" in m or "voir si ça marche" in m:
             return {"action": "banc", "reponse": "Je me teste"}
-        if "longue" in m or "formel" in m:
-            return {"action": "style", "texte": "Lettres plus courtes (250 mots max).", "reponse": "Noté"}
         return {"action": "discuter", "reponse": "Bien noté 👍"}
     if agent == "coach":
         m = d.get("message", "").lower()
@@ -119,8 +121,6 @@ def manager(texte: str) -> tuple[list, str]:
         return [("pause", {"jusqu_au": "2099-06-20"})], ""
     if "essayer" in m or "voir si ça marche" in m:
         return [("teste_toi", {})], "Je me teste, rapport dans 3 minutes."
-    if "longue" in m or "formel" in m:
-        return [("regle_de_style", {"consigne": "Lettres plus courtes (250 mots max)."})], "Noté."
     if adresse := _re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", texte):
         return [("envoyer_par_email", {"adresse": adresse.group(0)})], ""
     if "ici" in m and "envoie" in m:
