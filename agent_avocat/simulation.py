@@ -103,6 +103,8 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
             return {"reponse": "C'est parti 🚀", "objectif_maj": maj, "termine": True}
         return {"reponse": "Super. Quelles villes ? Et tu veux un CDI ou un stage ?", "objectif_maj": maj,
                 "termine": False}
+    if agent == "decouvreur":
+        return {"pages": ["https://boards.greenhouse.io/cabinetsimule"]}
     if agent == "carnet":
         return {"resume": "- Elle a demandé une recherche et validé des candidatures.",
                 "a_retenir": [{"genre": "preference", "texte": "Préfère les cabinets de taille moyenne."}]

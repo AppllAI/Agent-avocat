@@ -1,13 +1,19 @@
-"""Agents Éclaireurs : trouvent les offres, en parallèle, aussi souvent que possible.
+"""Agents Éclaireurs : trouvent les offres, en parallèle, aussi souvent que possible. Fichier COMMUN à tous les agents
+(ce qui change d'un métier à l'autre est dans metier.py).
 
-  Gratuits (sans IA) → toutes les 15 min :
-    • LexGO : LE site belge d'emplois juridiques, via son API publique officielle (faite pour les agents)
-    • Indeed Belgique + Google Jobs via JobSpy (open source, MIT) : offres de moins de 4 jours
-    • Listes et pages surveillées (pages de listes, flux RSS, pages carrières de cabinets)
+  Gratuits (sans IA), à chaque veille (toutes les 15 min), chaque source à son rythme :
+    • EURES : toutes les offres des services publics belges (Forem, VDAB, Actiris) + agences + employeurs
+    • Forem (données ouvertes) : ~26 000 offres en temps réel, dont celles reprises de Jobat
+    • Recruteurs : pages carrières des entreprises (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee,
+      Teamtailor, Personio) — découvertes au fil de l'eau, puis surveillées pour toujours
+    • Indeed Belgique + Google Jobs via JobSpy (Google reprend aussi LinkedIn, Jobat, StepStone… à notre place)
+    • Listes et pages suivies (pages de listes, flux RSS, pages carrières)
+    • Sources du métier (metier.SOURCES) : LexGO pour le droit, Student.be / StudentJob pour les jobs étudiants
+    • Les alertes emploi reçues par email (LinkedIn, Jobat, StepStone…) : lues par le Trieur (agents/connecteurs.py)
   Payant (IA + recherche web) → 2 fois par jour :
-    • Éclaireur web : barreaux, Legalworld, sites des cabinets…
-Une source qui ne répond plus a 3 minutes, ensuite on avance sans elle.
-"""
+    • Éclaireur web : ce qui manque encore (barreaux, sites spécialisés, pages carrières sans logiciel connu)
+    • Découvreur de recruteurs : 1 fois par jour, de nouvelles pages carrières d'entreprises à surveiller
+Une source qui ne répond plus a 3 minutes, ensuite on avance sans elle."""
 from __future__ import annotations
 
 import json
@@ -16,11 +22,12 @@ import xml.etree.ElementTree as ET
 import re
 from concurrent.futures import ThreadPoolExecutor, wait
 
-from .. import config, db, llm, outils
+from .. import config, db, llm, metier, outils
+from . import connecteurs
 
 LEXGO = "https://www.lexgo.be/api/v1"
-# Déjà lus gratuitement toutes les 15 min : la recherche web (payante) ne doit pas y perdre une seule recherche
-DEJA_SURVEILLES = ["lexgo.be", "indeed.com", "be.indeed.com"]
+# Déjà lus gratuitement : la recherche web (payante) ne doit pas y perdre une seule recherche
+DEJA_SURVEILLES = metier.DEJA_LUS + ["indeed.com", "be.indeed.com", "leforem.be", "odwb.be"]
 
 SCHEMA_OFFRES = {
     "type": "object",
@@ -44,7 +51,7 @@ SCHEMA_OFFRES = {
 def _get_json(url, params=None, etag_cle=None):
     import requests
 
-    entetes = {"Accept": "application/json", "User-Agent": "agent-avocat (usage personnel de recherche d'emploi)"}
+    entetes = {"Accept": "application/json", "User-Agent": connecteurs.UA_AGENT}
     if etag_cle and db.kv_get(etag_cle):
         entetes["If-None-Match"] = db.kv_get(etag_cle)
     r = requests.get(url, params=params, headers=entetes, timeout=20)
@@ -72,6 +79,8 @@ def _fonctions_lexgo(dom) -> list[int]:
 
 
 def _lexgo(dom: dict) -> list[dict]:
+    if "lexgo" not in metier.SOURCES:
+        return []
     connus = {r["url"] for r in db.q("SELECT url FROM offres WHERE source='lexgo'")}
     sortie, details = [], 0
     for fid in _fonctions_lexgo(dom):
@@ -305,16 +314,41 @@ def recherche_web(n_requetes: int = 2) -> int:
     connues = [r["url"] for r in db.q("SELECT url FROM offres ORDER BY id DESC LIMIT 120")]
     with ThreadPoolExecutor(len(choix)) as ex:
         lots = list(ex.map(lambda q: _sur(lambda d: _une_requete(q, d, connues), dom, f"web « {q} »"), choix))
+    _sur(lambda d: decouvrir_recruteurs(), dom, "découverte de recruteurs")
     return enregistrer([o for lot in lots for o in lot])
 
 
-def veille_gratuite() -> int:
+def _eures(dom):
+    return connecteurs.eures(dom)
+
+
+def _forem(dom):
+    return connecteurs.forem(dom)
+
+
+def _recruteurs(dom):
+    return connecteurs.ats(dom)
+
+
+# Chaque source à son rythme (minutes) : assez souvent pour être parmi les premiers, sans abuser des sites
+RYTHMES = {"_lexgo": 15, "_listes": 30, "_jobspy": 60, "_pages": 60, "_eures": 60, "_forem": 60, "_recruteurs": 180}
+
+
+def _a_lancer(f, force: bool) -> bool:
+    cle = f"derniere_veille{f.__name__}"
+    if not force and time.time() - float(db.kv_get(cle) or 0) < RYTHMES.get(f.__name__, 15) * 60 - 30:
+        return False
+    db.kv_set(cle, time.time())
+    return True
+
+
+def veille_gratuite(force: bool = False) -> int:
     dom = config.domaine_actif()
     # Une source qui ne répond plus (Indeed bloque parfois sans jamais rendre la main) ne doit JAMAIS
     # bloquer l'agent : chacune a 3 minutes, ensuite on avance avec ce qu'on a.
-    ex = ThreadPoolExecutor(4)
+    ex = ThreadPoolExecutor(7)
     futurs = {ex.submit(_sur, f, dom, f.__name__.strip("_")): f.__name__.strip("_")
-              for f in (_lexgo, _listes, _jobspy, _pages)}
+              for f in (_lexgo, _listes, _jobspy, _pages, _eures, _forem, _recruteurs) if _a_lancer(f, force)}
     fini, pas_fini = wait(futurs, timeout=180)
     ex.shutdown(wait=False, cancel_futures=True)
     for f in pas_fini:
@@ -324,10 +358,34 @@ def veille_gratuite() -> int:
 
 def chercher() -> int:
     """Passage complet (utilisé par les tests et « cherche » sur Telegram)."""
-    return veille_gratuite() + recherche_web()
+    return veille_gratuite(force=True) + recherche_web()
+
+
+SCHEMA_PAGES = {"type": "object", "properties": {"pages": {"type": "array", "items": {"type": "string"},
+                "description": "adresses des pages carrières trouvées"}}, "required": ["pages"]}
+
+
+def decouvrir_recruteurs() -> int:
+    """Une fois par jour : la recherche web trouve des pages carrières d'entreprises (logiciels de recrutement) qui
+    publient des offres pour ce profil en Belgique. Ensuite, elles sont surveillées gratuitement à chaque veille."""
+    from datetime import date
+    if db.kv_get("decouverte_ats_du") == date.today().isoformat():
+        return 0
+    dom = config.domaine_actif()
+    mots = connecteurs.mots_cles(dom)
+    if not mots:
+        return 0
+    db.kv_set("decouverte_ats_du", date.today().isoformat())
+    contenu = json.dumps({"mots_cles": mots[:4], "villes": dom.get("villes"),
+                          "secteurs": dom.get("secteurs_uniquement") or dom.get("description")}, ensure_ascii=False)
+    r = llm.demander("decouvreur", "rapide", llm.prompt("decouvreur_ats"), contenu, SCHEMA_PAGES,
+                     web=True, recherches_max=4, max_tokens=2500, priorite="fond")
+    return connecteurs.noter_ats(connecteurs.detecter_ats(" ".join(r.get("pages") or [])), "recherche web")
 
 
 def enregistrer(offres: list[dict]) -> int:
+    # Chaque offre publiée via un logiciel de recrutement révèle une page carrières à surveiller ensuite
+    connecteurs.noter_ats(connecteurs.detecter_ats(" ".join(o.get("url") or "" for o in offres)), "offres vues")
     nouvelles = 0
     with db.tx() as c:
         for o in offres:
