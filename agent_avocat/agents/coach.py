@@ -53,6 +53,7 @@ MENU = ("📋 *Ce que tu peux me dire* (ou en vocal 🎙️, avec tes mots) :\n"
         "• « envoie ici la lettre 12 », « envoie-les sur mon autre mail » → je le fais\n"
         "• « pause jusqu'au 15 janvier » (examens, vacances) → je reprends tout seul ce jour-là\n"
         "• « tout effacer » → je repars de zéro (CV, recherche, mémoire)\n"
+        "• « note 14 : trop formel » → noter un test (sur 20) · « test » → où en est la phase de test\n"
         "• « j'ai trouvé » · « cherche » · « stats » · « reprendre » · « mode »")
 
 
@@ -61,9 +62,10 @@ def bienvenue():
                     "chacune et je postule. Je ne te dérange que pour décider.\n\n"
                     "*Pour démarrer :*\n1️⃣ Envoie ton CV en PDF ici\n2️⃣ Dis-moi ce que tu cherches "
                     "(poste, matières, villes, ce que tu refuses, date de début)\n\n"
-                    "🧪 Je démarre en *mode test* : je fais tout seul et j'envoie chaque candidature (avec CV et "
-                    "lettre) à l'adresse email de ton CV, jamais aux cabinets. Ici, je reste silencieux. "
-                    "Quand tout te plaît : « mode validation ».\n\n" + MENU)
+                    "🧪 *Phase de test d'abord* : je fais tout seul et je t'envoie 3 candidatures sur TON email, "
+                    "exactement comme le cabinet les recevrait. Tu les notes sur 20 et tu me dis ce que tu aimes ou "
+                    "pas ; je corrige et je refais un test. Après 2 tests et au moins 15/20, je te demande ton accord "
+                    "avant d'écrire au moindre cabinet.\n\n" + MENU)
 
 
 def parler(texte: str):

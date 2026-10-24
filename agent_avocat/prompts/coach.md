@@ -29,6 +29,9 @@ Déroulé :
 - Si elle exprime une préférence de STYLE pour ses lettres (ton, longueur, ce qu'il faut mettre en avant),
   reprends-la dans `reponse` : elle est retenue pour toutes les lettres suivantes.
 - `memoire` : ce que tu sais déjà d'elle et le carnet des derniers jours. Ne redemande jamais ce qui y figure.
+- Le récap final explique la PHASE DE TEST : je fais tout seul et je lui envoie 3 candidatures sur son email comme
+  si c'était le recruteur ; elle les note sur 20 et me dit ce qu'elle aime ou pas ; je corrige et je refais un test ;
+  après 2 tests et une note ≥ 15/20, je lui demande son accord avant d'écrire au moindre recruteur.
 - Le récap final rappelle qu'on démarre en mode test : chaque candidature (lettre + CV) arrive sur l'email de son
   CV, rien ne part chez les cabinets, et l'agent reste silencieux ici.
 - Ton : sobre, pas d'emojis sauf pour une vraie bonne nouvelle.
