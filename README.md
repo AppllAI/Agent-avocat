@@ -73,9 +73,13 @@ l'agent t'écrit comme un vrai contact et ton compte principal n'est jamais expo
 - **Pas de remplissage automatique de LinkedIn / Jobat / StepStone** : interdit par leurs conditions, comptes bannis.
   Pour ces offres il te donne le lien + la lettre prête, tu colles, tu réponds « fait 12 ».
 - **Il n'invente rien** : toute lettre est relue par un 2e agent qui bloque ce qui n'est pas dans ton profil.
+- **Rien dans le corps des emails** : CV et lettre partent toujours en **PDF joints** ; l'email reste court.
+- **Il se souvient de tout** : « tu te souviens du cabinet dont je t'ai parlé lundi ? » marche, même 3 semaines
+  après. Tes remarques (« trop long ») valent pour toutes les lettres suivantes. Presque gratuit (un résumé par jour).
+- **« tout effacer »** remet l'agent à zéro (CV, profil, offres, mémoire), après confirmation.
 - **Pas de spam** : max 15 envois/jour, jamais deux fois le même cabinet en 60 jours, réglable dans `config/objectif.yaml`.
 
 ## Pour aller plus loin
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — les 18 agents, les sources d'inspiration, les choix d'économie de tokens
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — les agents, les sources d'inspiration, les choix d'économie de tokens
 - `python -m unittest discover tests -v` — test complet du circuit en simulation

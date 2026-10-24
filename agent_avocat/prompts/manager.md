@@ -1,6 +1,10 @@
 Ce que tu sais du fonctionnement (métier : droit en Belgique — stagiaire avocat, juriste, collaborateur, paralegal) :
-- Mode TEST (« repetition », par défaut) : tout se fait seul et chaque candidature (email + CV + lettre) part vers
-  l'adresse email de son CV, jamais aux cabinets ; rien ne s'affiche ici. Mode validation : elle valide chaque
+- PHASE DE TEST OBLIGATOIRE (`phase_de_test` dans le contexte) : chaque test = 3 candidatures envoyées à SON email,
+  exactement comme un recruteur les recevrait. Elle note sur 20 et dit ce qu'elle a aimé / moins aimé → `noter_test`
+  (ses remarques s'appliquent aux lettres suivantes, les candidatures sont réécrites = test suivant). Réussite : au
+  moins 2 tests et ≥ 15/20, puis SON accord explicite → `autoriser_envoi_reel` (envoi direct aux recruteurs).
+  Avant ça, aucun envoi réel n'est possible : explique-le simplement si elle le demande.
+- Mode TEST (« repetition ») : tout part vers son email, jamais aux cabinets. Mode validation : elle valide chaque
   envoi réel. Mode auto : envoi réel automatique des lettres bien notées par le Juge.
 - Sources : LexGO (API officielle), Indeed et Google Jobs toutes les 15 min ; recherche web (barreaux, Legalworld,
   sites des cabinets) 2×/jour ; candidatures spontanées aux cabinets chaque matin. Les limites (envois/jour,

@@ -51,9 +51,13 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
         o = d["offre"]
         corps = ("Mon parcours m'a permis de travailler des dossiers concrets, de rédiger des notes de synthèse "
                  "et de suivre des audiences, ce qui correspond aux missions décrites dans votre annonce. ") * 6
-        return {"lettre": f"Bruxelles, le {d['date_du_jour']}\n\nMadame, Monsieur,\n\nVotre offre de {o['poste']} "
-                          f"chez {o['employeur']} a retenu toute mon attention.\n\n{corps}\n\nJe vous prie d'agréer, "
-                          "Madame, Monsieur, l'expression de mes salutations distinguées.\n\nAlex Test",
+        return {"expediteur": ["Alex Test", "Bruxelles", "alex.test@exemple.be"],
+                "destinataire": [o["employeur"]], "lieu_date": f"Bruxelles, le {d['date_du_jour']}",
+                "objet_lettre": f"Candidature – {o['poste']}", "appel": "Madame, Monsieur,",
+                "paragraphes": [f"Votre offre de {o['poste']} chez {o['employeur']} a retenu toute mon attention.",
+                                corps.strip()],
+                "politesse": "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.",
+                "signature": "Alex Test",
                 "objet": f"Candidature – {o['poste']}",
                 "email": "Madame, Monsieur,\n\nVeuillez trouver ci-joint mon CV et ma lettre de motivation.\n\nBien à vous"}
     if agent == "juge":
@@ -99,6 +103,12 @@ def repondre(agent: str, contenu: str, schema: dict) -> dict:
             return {"reponse": "C'est parti 🚀", "objectif_maj": maj, "termine": True}
         return {"reponse": "Super. Quelles villes ? Et tu veux un CDI ou un stage ?", "objectif_maj": maj,
                 "termine": False}
+    if agent == "decouvreur":
+        return {"pages": ["https://boards.greenhouse.io/cabinetsimule"]}
+    if agent == "carnet":
+        return {"resume": "- Elle a demandé une recherche et validé des candidatures.",
+                "a_retenir": [{"genre": "preference", "texte": "Préfère les cabinets de taille moyenne."}]
+                if "cabinets moyens" in contenu else []}
     if agent == "profileur":
         if "lignes" in schema.get("properties", {}):
             return {"lignes": [f"- {d.get('texte', contenu)}"]}
@@ -120,7 +130,9 @@ def manager(texte: str) -> tuple[list, str]:
     if "essayer" in m or "voir si ça marche" in m:
         return [("teste_toi", {})], "Je me teste, rapport dans 3 minutes."
     if "longue" in m or "formel" in m:
-        return [("regle_de_style", {"consigne": "Lettres plus courtes (250 mots max)."})], "Noté."
+        return [("retenir", {"texte": "Lettres plus courtes (250 mots max).", "genre": "style"})], "Noté."
+    if "souviens" in m or "rappelle" in m:
+        return [("se_souvenir", {"mots": texte})], ""
     if adresse := _re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", texte):
         return [("envoyer_par_email", {"adresse": adresse.group(0)})], ""
     if "ici" in m and "envoie" in m:
