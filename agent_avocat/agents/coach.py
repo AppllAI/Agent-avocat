@@ -11,7 +11,7 @@ import os
 import shutil
 from pathlib import Path
 
-from .. import config, db, llm, messagerie
+from .. import config, db, llm, memoire, messagerie
 
 LISTE = {"type": "array", "items": {"type": "string"}}
 SCHEMA_COACH = {
@@ -48,8 +48,11 @@ MENU = ("📋 *Ce que tu peux me dire* (ou en vocal 🎙️, avec tes mots) :\n"
         "• « essai » + un lien d'offre → je te montre ce que je ferais, sans envoyer\n"
         "• « teste-toi » → 5 lettres d'exemple notées, pour juger ma qualité\n"
         "• « plus de droit fiscal », « ajoute Liège » → changer ta recherche\n"
+        "• « trop long », « moins formel » → je retiens pour toutes les lettres\n"
+        "• « tu te souviens de la boîte de mardi ? » → je me souviens de tout ce qu'on s'est dit\n"
         "• « envoie ici la lettre 12 », « envoie-les sur mon autre mail » → je le fais\n"
         "• « pause jusqu'au 15 janvier » (examens, vacances) → je reprends tout seul ce jour-là\n"
+        "• « tout effacer » → je repars de zéro (CV, recherche, mémoire)\n"
         "• « j'ai trouvé » · « cherche » · « stats » · « reprendre » · « mode »")
 
 
@@ -68,7 +71,8 @@ def parler(texte: str):
     actif = o.get("domaine_actif", "droit_belge")
     dom = o.setdefault("domaines", {}).setdefault(actif, {})
     contexte = {"objectif_actuel": dom, "cv_recu": config.chemin_cv().exists() and bool(config.profil_texte().strip()),
-                "profil": config.profil_texte()[:1500], "historique": db.historique(6), "message": texte}
+                "profil": config.profil_texte()[:1500], "historique": db.historique(12), "memoire": memoire.contexte(10) or None,
+                "message": texte}
     try:
         r = llm.demander("coach", "rapide", llm.prompt("coach"), json.dumps(contexte, ensure_ascii=False),
                          SCHEMA_COACH, max_tokens=900)

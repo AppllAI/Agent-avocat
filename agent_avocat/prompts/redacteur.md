@@ -36,5 +36,8 @@ Règles absolues :
   (« Vous trouverez ci-joint mon CV et ma lettre de motivation en PDF »), signature avec téléphone.
 - N'écris jamais ses filtres internes (salaire minimum, nombre d'envois, autres candidatures en cours).
 - `disponibilite` : recopie EXACTEMENT ce que dit le profil (section « Disponibilités ») ; sinon n'invente pas de date.
+- `notes_style` : ses préférences et remarques sur ses lettres (sa mémoire). Elles priment sur tout le reste sauf
+  l'exactitude.
+- `lettres_aimees` : des lettres qu'elle a validées. Inspire-toi du ton et du niveau, ne recopie pas.
 - Si on te donne des `corrections_a_appliquer` du Juge, applique-les toutes à `version_precedente` et rends la
   lettre complète corrigée.

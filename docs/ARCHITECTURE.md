@@ -133,8 +133,18 @@ inventée, des thèmes de mémoire inventés, B2 au lieu de B1) → les 4 attrap
 4. **Mode validation** — `mode validation` : réel, rien ne part sans ton ✅.
 5. **Mode auto** — `mode auto` : il envoie seul les lettres notées ≥ 7/10 par le Juge (réglable).
 
-Pas de mémoire pour l'instant : l'agent n'apprend pas tes préférences de style d'une lettre à l'autre
-(chaque lettre part du profil, de l'offre et des faits sur l'employeur). Ce sera ajouté plus tard.
+## Mémoire : il se souvient de tout, pour presque rien (`memoire.py`)
+
+| Étage | Ce que c'est | Coût |
+|---|---|---|
+| Fil récent | les 14 derniers messages, mot pour mot, datés | 0 € |
+| Carnet de bord | chaque journée écoulée résumée UNE fois (demandes, décisions, n° d'offres, employeurs) ; les 14 derniers jours toujours sous les yeux du Manager | ≈ 0,001 € / jour |
+| Recherche | « la boîte dont je t'ai parlé il y a 5 jours » → l'outil `se_souvenir` fouille tout l'historique (messages, offres, emails, rdv, carnet) sans IA et rend les passages datés | 0 € |
+| Souvenirs durables | préférences, décisions (« plus jamais chez X »), faits, remarques de style — appliqués à toutes les lettres | 0 € |
+
+Le bloc mémoire du Manager ne change qu'une fois par jour : il reste dans le cache de prompt (~10 % du prix).
+Les lettres que tu valides servent aussi de modèle de ton. « oublie que… » efface un souvenir ;
+« tout effacer » remet l'agent à zéro (CV, profil, offres, mémoire), après confirmation.
 
 ## Budget
 
